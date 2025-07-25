@@ -3,8 +3,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Import the router from our chat endpoint file
-from backend.api.v1 import chat
+# Import the router from our chat endpoint file (path fixed for Render)
+from api.v1 import chat
 
 # Create an instance of the FastAPI class
 app = FastAPI(
@@ -14,6 +14,7 @@ app = FastAPI(
 )
 
 # --- Middleware ---
+# We will add the live frontend URL here later
 origins = [
     "http://localhost",
     "http://localhost:5500",
@@ -31,10 +32,6 @@ app.add_middleware(
 
 # --- API Routers ---
 # Include the router from our v1 chat API.
-# All routes defined in chat.router will now be part of the main app.
-# The 'prefix' adds '/api/v1' to the start of all routes from that router.
-# So, the '/chat' endpoint becomes '/api/v1/chat'.
-# The 'tags' are used to group the endpoints in the automatic API docs.
 app.include_router(chat.router, prefix="/api/v1", tags=["v1"])
 
 

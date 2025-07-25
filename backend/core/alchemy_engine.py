@@ -1,8 +1,9 @@
 # backend/core/alchemy_engine.py
 
 from typing import List, Dict, Optional
-from backend.models.chat_models import ChatMessage
-from backend.services.openrouter_client import get_ai_response
+# Import paths fixed for Render
+from models.chat_models import ChatMessage
+from services.openrouter_client import get_ai_response
 
 # --- NEW: We will simulate a search function for now ---
 # In a real application, this would use a library like 'requests' or a real search API
