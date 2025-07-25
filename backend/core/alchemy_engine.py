@@ -5,14 +5,15 @@ from typing import List, Dict, Optional
 from models.chat_models import ChatMessage
 from services.openrouter_client import get_ai_response
 
-# --- NEW: We will simulate a search function for now ---
-# In a real application, this would use a library like 'requests' or a real search API
+# (The rest of your alchemy_engine.py file is correct and does not need to change)
+# ... paste the rest of your existing alchemy_engine.py code here ...
+# (Make sure the perform_web_search and create_system_prompt functions are included)
+
 def perform_web_search(query: str) -> str:
     """
     Simulates performing a web search and returning the top results.
     """
     print(f"Performing simulated web search for: {query}")
-    # We'll return some example best practices based on our research
     if "gpt" in query.lower():
         return """
 - Research Result 1: For GPT models, it's best to be very direct. Place instructions at the beginning of the prompt.
@@ -32,18 +33,13 @@ def perform_web_search(query: str) -> str:
 - Research Result 3: Break down complex tasks into smaller, more manageable steps in the prompt.
 """
 
-# --- THIS FUNCTION IS NOW UPGRADED WITH LIVE SEARCH ---
 def create_system_prompt(user_idea: str, target_model: str) -> str:
     """
     Creates the master system prompt. It now performs a web search
     for the latest prompting techniques to include in its instructions.
     """
-    
-    # 1. Perform a web search for the latest prompting guides
     search_query = f"latest prompting techniques for {target_model}"
     latest_research = perform_web_search(search_query)
-
-    # 2. Construct the final system prompt, including the research
     system_prompt = f"""
 You are 'Prompt Alchemist', a world-class AI assistant that creates expert-level prompts.
 
@@ -72,8 +68,6 @@ Finally, in your explanation, you MUST mention how you used one of the specific 
 """
     return system_prompt
 
-
-# This function remains unchanged as it correctly handles the conversation flow
 async def process_chat_request(messages: List[ChatMessage], model: str, mode: str) -> Dict[str, str]:
     """
     Processes a chat request based on the current mode.
