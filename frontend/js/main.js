@@ -13,7 +13,7 @@ const chatInner = document.getElementById('chat-inner');
 const modelSelector = document.getElementById('model-selector');
 const clearChatBtn = document.getElementById('clear-chat-btn');
 
-const API_URL = 'http://127.0.0.1:8000/api/v1/chat';
+const API_URL = 'https://prompt-alchemist.onrender.com/api/v1/chat';
 let conversationHistory = [];
 let currentMode = 'guided';
 
