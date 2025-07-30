@@ -17,11 +17,9 @@ app = FastAPI(
 # We will add the live frontend URL here later
 origins = [
     "http://localhost",
-    "http://localhost:5500",
     "http://127.0.0.1",
-    "http://127.0.0.1:5500",
-    "https://chipper-bombolone-83adcd.netlify.app",   # Netlify preview
-    "https://whattoprompt.com",                       # your custom domain
+    "https://chipper-bombolone-83adcd.netlify.app",  # Netlify preview site
+    "https://whattoprompt.com",                       # Your custom domain
 ]
 
 app.add_middleware(
