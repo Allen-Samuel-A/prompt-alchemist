@@ -5,7 +5,7 @@ import httpx
 from dotenv import load_dotenv
 from typing import List
 from pathlib import Path
-from models.chat_models import ChatMessage
+from backend.models.chat_models import ChatMessage
 
 
 # --- Correctly load the .env file ---
