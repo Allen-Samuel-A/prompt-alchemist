@@ -99,8 +99,9 @@
       white-space: pre-wrap;
       word-wrap: break-word;
       font-family: 'Inter', sans-serif;
-      font-size: 0.9rem;
+      font-size: 15px;
       line-height: 1.6;
+      letter-spacing: 0.01em;
     }
 
     ::-webkit-scrollbar {
@@ -131,9 +132,173 @@
         min-width: 100%;
       }
     }
+
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 200px;
+      background-color: #1f2937;
+      color: #fff;
+      text-align: left;
+      border-radius: 6px;
+      padding: 8px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -100px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 0.75rem;
+      line-height: 1.4;
+    }
+
+    .tooltip .tooltiptext::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: #1f2937 transparent transparent transparent;
+    }
+
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    #scroll-to-top {
+      transition: all 0.3s ease;
+    }
+
+    #scroll-to-top.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .tutorial-slide {
+      animation: fadeInSlide 0.4s ease-out;
+    }
+
+    @keyframes fadeInSlide {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .template-card {
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .template-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-color: #9ca3af;
+    }
+
+    .kbd {
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      font-family: monospace;
+    }
+
+    /* Fix for guided mode button hover */
+    .mode-btn {
+      transition: all 0.2s ease;
+    }
+
+    .mode-btn.active {
+      background: #000;
+      color: white;
+    }
+
+    .mode-btn:not(.active):hover {
+      background: #f9fafb;
+    }
   </style>
 </head>
 <body class="bg-white h-screen flex flex-col overflow-hidden">
+
+  <!-- Tutorial Modal -->
+  <div id="tutorial-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden">
+      <div id="tutorial-content" class="p-8">
+        <div class="tutorial-slide" data-slide="1">
+          <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-4xl mb-6 mx-auto">?</div>
+          <h2 class="text-3xl font-bold text-center mb-4">Welcome to What To Prompt!</h2>
+          <p class="text-gray-600 text-center mb-6">Learn how to create amazing AI prompts in just a few steps. This quick guide will show you everything you need to know!</p>
+          <div class="text-center text-sm text-gray-500">Slide 1 of 4</div>
+        </div>
+        <div class="tutorial-slide hidden" data-slide="2">
+          <div class="text-5xl text-center mb-6">🎨</div>
+          <h2 class="text-2xl font-bold text-center mb-4">Choose Your Mode</h2>
+          <div class="space-y-4 mb-6">
+            <div class="p-4 bg-gray-50 rounded-lg">
+              <h3 class="font-semibold mb-2">📝 Visual Builder</h3>
+              <p class="text-sm text-gray-600">Fill in structured fields like Role, Task, Context, and Constraints. Perfect for detailed prompts!</p>
+            </div>
+            <div class="p-4 bg-gray-50 rounded-lg">
+              <h3 class="font-semibold mb-2">💬 Guided Chat</h3>
+              <p class="text-sm text-gray-600">Chat with AI to refine your prompt ideas. The AI helps you create the perfect prompt through conversation!</p>
+            </div>
+          </div>
+          <div class="text-center text-sm text-gray-500">Slide 2 of 4</div>
+        </div>
+        <div class="tutorial-slide hidden" data-slide="3">
+          <div class="text-5xl text-center mb-6">⚡</div>
+          <h2 class="text-2xl font-bold text-center mb-4">Try Example Templates</h2>
+          <p class="text-gray-600 text-center mb-4">Click any example template to get started instantly!</p>
+          <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <ul class="text-sm text-gray-700 space-y-2">
+              <li>• Write blog posts and articles</li>
+              <li>• Create code and scripts</li>
+              <li>• Design marketing campaigns</li>
+              <li>• Craft professional emails</li>
+            </ul>
+          </div>
+          <div class="text-center text-sm text-gray-500">Slide 3 of 4</div>
+        </div>
+        <div class="tutorial-slide hidden" data-slide="4">
+          <div class="text-5xl text-center mb-6">⌨️</div>
+          <h2 class="text-2xl font-bold text-center mb-4">Keyboard Shortcuts</h2>
+          <p class="text-gray-600 text-center mb-4">Work faster with these shortcuts:</p>
+          <div class="bg-gray-50 rounded-lg p-4 mb-6 space-y-2 text-sm">
+            <div class="flex justify-between items-center">
+              <span>Send message</span>
+              <span class="kbd">Ctrl + Enter</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span>Clear chat</span>
+              <span class="kbd">Ctrl + K</span>
+            </div>
+          </div>
+          <div class="text-center text-sm text-gray-500">Slide 4 of 4</div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-8 py-4 flex items-center justify-between border-t">
+        <button id="tutorial-skip" class="text-sm text-gray-600 hover:text-black font-medium">Skip Tutorial</button>
+        <div class="flex gap-2">
+          <button id="tutorial-prev" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 font-medium hidden">Previous</button>
+          <button id="tutorial-next" class="px-6 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 font-medium">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Privacy Modal -->
   <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
@@ -144,100 +309,106 @@
         <input type="checkbox" id="dismiss-forever" class="w-4 h-4 rounded focus:ring-gray-500" />
         <label for="dismiss-forever" class="ml-2 text-sm text-gray-600">Don't show this again</label>
       </div>
-      <button id="close-modal-btn" class="w-full gradient-btn text-white px-6 py-3 rounded-lg font-medium">
-        Understood
-      </button>
+      <button id="close-modal-btn" class="w-full gradient-btn text-white px-6 py-3 rounded-lg font-medium">Understood</button>
     </div>
   </div>
+
+  <!-- Scroll to Top Button -->
+  <button id="scroll-to-top" class="fixed bottom-6 right-6 bg-black text-white p-3 rounded-full shadow-lg hover:bg-gray-800 transition opacity-0 pointer-events-none z-40">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+    </svg>
+  </button>
 
   <!-- Header -->
   <header class="border-b border-gray-200 bg-white">
     <div class="px-6 py-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-2xl">
-          ?
-        </div>
+        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-2xl">?</div>
         <div>
           <h1 class="text-xl font-semibold">What To Prompt?</h1>
           <p class="text-xs text-gray-500">AI-Powered Prompt Engineering</p>
         </div>
       </div>
-      <button id="help-btn" class="text-gray-600 hover:text-black text-sm font-medium">
-        Help
-      </button>
+      <button id="help-btn" class="text-gray-600 hover:text-black text-sm font-medium">Help</button>
     </div>
   </header>
 
   <!-- Help Drawer -->
   <div id="help-drawer" class="hidden fixed right-4 top-20 bg-white rounded-lg shadow-xl border border-gray-200 p-6 w-80 z-50">
-    <h3 class="font-semibold text-lg mb-3">How to Use</h3>
-    <div class="space-y-2 text-sm text-gray-600">
-      <p>• <strong>Visual Builder:</strong> Structured fields for detailed prompts</p>
-      <p>• <strong>Guided Chat:</strong> Natural conversation to refine ideas</p>
-      <p>• <strong>Switch Models:</strong> Try different AI models</p>
-      <p>• <strong>Clear Chat:</strong> Start fresh anytime</p>
+    <h3 class="font-semibold text-lg mb-3">Keyboard Shortcuts</h3>
+    <div class="space-y-2 text-sm text-gray-600 mb-4">
+      <div class="flex justify-between"><span>Send message</span><span class="kbd">Ctrl+Enter</span></div>
+      <div class="flex justify-between"><span>Clear chat</span><span class="kbd">Ctrl+K</span></div>
     </div>
-    <button onclick="document.getElementById('help-drawer').classList.add('hidden')" 
-      class="mt-4 w-full text-sm text-gray-600 hover:text-black font-medium">
-      Close
-    </button>
+    <button onclick="document.getElementById('tutorial-modal').classList.remove('hidden')" class="mt-2 w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition">Show Tutorial Again</button>
+    <button onclick="document.getElementById('help-drawer').classList.add('hidden')" class="mt-2 w-full text-sm text-gray-600 hover:text-black font-medium">Close</button>
   </div>
 
   <!-- Main Layout -->
   <div class="flex flex-1 overflow-hidden">
     <!-- Left Sidebar -->
     <div class="sidebar border-r border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
-      <div class="p-4 flex-shrink-0">
+      <div class="p-4 flex-shrink-0 overflow-y-auto">
         <!-- Mode Switcher -->
         <div class="mb-6">
           <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Mode</label>
           <div class="flex rounded-lg bg-white border border-gray-200 overflow-hidden">
-            <button type="button" id="visual-mode-btn" 
-              class="flex-1 px-4 py-2.5 text-sm font-medium border-r border-gray-200 hover:bg-gray-50 transition">
-              Visual
-            </button>
-            <button type="button" id="guided-mode-btn" 
-              class="flex-1 px-4 py-2.5 text-sm font-medium bg-black text-white hover:bg-gray-800 transition">
-              Guided
-            </button>
+            <button type="button" id="visual-mode-btn" class="mode-btn flex-1 px-4 py-2.5 text-sm font-medium border-r border-gray-200">Visual</button>
+            <button type="button" id="guided-mode-btn" class="mode-btn active flex-1 px-4 py-2.5 text-sm font-medium">Guided</button>
           </div>
         </div>
 
         <!-- Visual Form -->
         <form id="visual-form" class="space-y-4 hidden">
           <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Role</label>
-            <textarea id="role-input" rows="2" placeholder="e.g., Senior Developer"
-              class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition resize-none"></textarea>
+            <div class="flex items-center gap-1 mb-2">
+              <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</label>
+              <div class="tooltip">
+                <span class="text-gray-400 cursor-help text-xs">?</span>
+                <span class="tooltiptext">What role should the AI act as? e.g., "Senior Developer", "Marketing Expert"</span>
+              </div>
+            </div>
+            <textarea id="role-input" rows="2" placeholder="e.g., Senior Developer" class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition resize-none"></textarea>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Task *</label>
-            <textarea id="task-input" rows="2" placeholder="e.g., Write a function"
-              class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition resize-none"></textarea>
+            <div class="flex items-center gap-1 mb-2">
+              <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Task *</label>
+              <div class="tooltip">
+                <span class="text-gray-400 cursor-help text-xs">?</span>
+                <span class="tooltiptext">What do you want the AI to do? Be specific about the main goal.</span>
+              </div>
+            </div>
+            <textarea id="task-input" rows="2" placeholder="e.g., Write a Python function" class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition resize-none"></textarea>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Context</label>
-            <textarea id="context-input" rows="2" placeholder="e.g., For web app"
-              class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition resize-none"></textarea>
+            <div class="flex items-center gap-1 mb-2">
+              <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Context</label>
+              <div class="tooltip">
+                <span class="text-gray-400 cursor-help text-xs">?</span>
+                <span class="tooltiptext">Background information or details that help the AI understand your needs better.</span>
+              </div>
+            </div>
+            <textarea id="context-input" rows="2" placeholder="e.g., For a web application" class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition resize-none"></textarea>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Constraints</label>
-            <textarea id="constraints-input" rows="2" placeholder="e.g., Use TypeScript"
-              class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition resize-none"></textarea>
+            <div class="flex items-center gap-1 mb-2">
+              <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Constraints</label>
+              <div class="tooltip">
+                <span class="text-gray-400 cursor-help text-xs">?</span>
+                <span class="tooltiptext">Any limitations or requirements? e.g., "Use only vanilla JavaScript", "Keep under 100 words"</span>
+              </div>
+            </div>
+            <textarea id="constraints-input" rows="2" placeholder="e.g., Use TypeScript" class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition resize-none"></textarea>
           </div>
-          <button type="submit" class="w-full gradient-btn text-white px-4 py-3 rounded-md font-medium text-sm">
-            Generate Prompt
-          </button>
+          <button type="submit" class="w-full gradient-btn text-white px-4 py-3 rounded-md font-medium text-sm">Generate Prompt</button>
         </form>
 
         <!-- Guided Form -->
         <div id="guided-form-container">
           <form id="guided-form" class="relative">
-            <input id="guided-input" type="text" 
-              class="w-full px-4 py-3 pr-12 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition" 
-              placeholder="Type your idea..." />
-            <button type="submit" 
-              class="absolute right-2 top-1/2 -translate-y-1/2 bg-black text-white rounded p-2 hover:bg-gray-800 transition">
+            <input id="guided-input" type="text" class="w-full px-4 py-3 pr-12 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition" placeholder="Type your idea..." />
+            <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 bg-black text-white rounded p-2 hover:bg-gray-800 transition">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
@@ -269,9 +440,7 @@
             <option value="openai/gpt-4o">OpenAI - GPT-4o</option>
           </select>
         </div>
-        <button type="button" id="clear-chat-btn" class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50 hover:border-red-400 hover:text-red-600 transition font-medium">
-          Clear Chat
-        </button>
+        <button type="button" id="clear-chat-btn" class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50 hover:border-red-400 hover:text-red-600 transition font-medium">Clear Chat</button>
       </div>
     </div>
 
@@ -281,16 +450,46 @@
         <div class="max-w-4xl mx-auto">
           <div id="chat-inner" class="flex flex-col gap-3">
             <div id="placeholder" class="flex flex-col items-center justify-center min-h-[400px] text-center">
-              <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-5xl mb-4">
-                ?
-              </div>
+              <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-5xl mb-6">?</div>
               <h2 class="text-2xl font-semibold text-gray-900 mb-2">Ready to Create Prompts</h2>
-              <p class="text-gray-500 text-sm">Choose a mode and start crafting your AI prompt</p>
+              <p class="text-gray-500 text-sm mb-8">Choose a mode above or try an example below</p>
+              
+              <!-- Example Templates -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
+                <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="blog">
+                  <div class="text-2xl mb-2">📝</div>
+                  <h3 class="font-semibold text-sm mb-1">Write a Blog Post</h3>
+                  <p class="text-xs text-gray-600">Create engaging content about any topic</p>
+                </div>
+                <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="code">
+                  <div class="text-2xl mb-2">💻</div>
+                  <h3 class="font-semibold text-sm mb-1">Generate Code</h3>
+                  <p class="text-xs text-gray-600">Build functions, scripts, or applications</p>
+                </div>
+                <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="marketing">
+                  <div class="text-2xl mb-2">🎯</div>
+                  <h3 class="font-semibold text-sm mb-1">Marketing Campaign</h3>
+                  <p class="text-xs text-gray-600">Design promotional content and strategies</p>
+                </div>
+                <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="email">
+                  <div class="text-2xl mb-2">✉️</div>
+                  <h3 class="font-semibold text-sm mb-1">Professional Email</h3>
+                  <p class="text-xs text-gray-600">Craft clear and effective emails</p>
+                </div>
+              </div>
             </div>
             <div id="chat-anchor"></div>
           </div>
         </div>
       </div>
+
+      <!-- Footer -->
+      <footer class="border-t border-gray-200 py-3 px-8 bg-gray-50">
+        <div class="max-w-4xl mx-auto flex items-center justify-center gap-2 text-xs text-gray-600">
+          <span>© 2025</span>
+          <a href="http://allensamuel.me/" target="_blank" class="font-medium hover:text-black transition">Allen Samuel</a>
+        </div>
+      </footer>
     </div>
   </div>
 
@@ -298,6 +497,7 @@
     const API_URL = 'https://prompt-alchemist.onrender.com/api/v1/chat';
     let conversationHistory = [];
     let currentMode = 'guided';
+    let currentTutorialSlide = 1;
 
     const chatInner = document.getElementById('chat-inner');
     const visualForm = document.getElementById('visual-form');
@@ -314,12 +514,141 @@
     const spinner = document.getElementById('loading-spinner');
     const helpBtn = document.getElementById('help-btn');
     const helpDrawer = document.getElementById('help-drawer');
+    const scrollToTopBtn = document.getElementById('scroll-to-top');
+    const chatContainer = document.getElementById('chat-container');
+
+    // Template data
+    const templates = {
+      blog: {
+        role: 'Professional Content Writer',
+        task: 'Write an engaging blog post',
+        context: 'For a technology blog targeting young professionals',
+        constraints: 'Keep it between 800-1000 words, use conversational tone, include actionable tips'
+      },
+      code: {
+        role: 'Senior Software Engineer',
+        task: 'Write a Python function',
+        context: 'For a web application that processes user data',
+        constraints: 'Use type hints, include error handling, add documentation'
+      },
+      marketing: {
+        role: 'Digital Marketing Specialist',
+        task: 'Create a social media campaign',
+        context: 'For a new product launch targeting millennials',
+        constraints: 'Focus on Instagram and TikTok, use trending formats, include hashtag strategy'
+      },
+      email: {
+        role: 'Professional Business Communicator',
+        task: 'Write a professional email',
+        context: 'For business correspondence with clients or colleagues',
+        constraints: 'Keep it concise, maintain professional tone, clear call-to-action'
+      }
+    };
+
+    // Tutorial functionality
+    const tutorialModal = document.getElementById('tutorial-modal');
+    const tutorialNext = document.getElementById('tutorial-next');
+    const tutorialPrev = document.getElementById('tutorial-prev');
+    const tutorialSkip = document.getElementById('tutorial-skip');
+
+    function showTutorialSlide(slideNum) {
+      document.querySelectorAll('.tutorial-slide').forEach(slide => {
+        slide.classList.add('hidden');
+      });
+      document.querySelector(`[data-slide="${slideNum}"]`).classList.remove('hidden');
+      
+      tutorialPrev.classList.toggle('hidden', slideNum === 1);
+      tutorialNext.textContent = slideNum === 4 ? "Let's Go!" : "Next";
+      currentTutorialSlide = slideNum;
+    }
+
+    tutorialNext.addEventListener('click', () => {
+      if (currentTutorialSlide === 4) {
+        tutorialModal.classList.add('hidden');
+        localStorage.setItem('tutorialCompleted', 'true');
+      } else {
+        showTutorialSlide(currentTutorialSlide + 1);
+      }
+    });
+
+    tutorialPrev.addEventListener('click', () => {
+      if (currentTutorialSlide > 1) {
+        showTutorialSlide(currentTutorialSlide - 1);
+      }
+    });
+
+    tutorialSkip.addEventListener('click', () => {
+      tutorialModal.classList.add('hidden');
+      localStorage.setItem('tutorialCompleted', 'true');
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Ctrl/Cmd + Enter to send
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (currentMode === 'visual') {
+          visualForm.dispatchEvent(new Event('submit'));
+        } else {
+          guidedForm.dispatchEvent(new Event('submit'));
+        }
+      }
+      
+      // Ctrl/Cmd + K to clear chat
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        if (confirm('Clear all chat history?')) {
+          clearChat();
+        }
+      }
+    });
+
+    // Template card click handlers
+    document.addEventListener('click', (e) => {
+      const templateCard = e.target.closest('.template-card');
+      if (templateCard) {
+        const templateType = templateCard.dataset.template;
+        const template = templates[templateType];
+        
+        if (template) {
+          setMode('visual');
+          roleInput.value = template.role;
+          taskInput.value = template.task;
+          contextInput.value = template.context;
+          constraintsInput.value = template.constraints;
+          
+          // Focus on the first input
+          setTimeout(() => roleInput.focus(), 100);
+        }
+      }
+    });
+
+    // Scroll to top functionality
+    chatContainer.addEventListener('scroll', () => {
+      if (chatContainer.scrollTop > 300) {
+        scrollToTopBtn.classList.add('show');
+      } else {
+        scrollToTopBtn.classList.remove('show');
+      }
+    });
+
+    scrollToTopBtn.addEventListener('click', () => {
+      chatContainer.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 
     // Privacy Modal
     window.addEventListener('DOMContentLoaded', () => {
       const modal = document.getElementById('privacy-modal');
       const closeBtn = document.getElementById('close-modal-btn');
       const dismissCheckbox = document.getElementById('dismiss-forever');
+
+      // Show tutorial if first time
+      if (!localStorage.getItem('tutorialCompleted')) {
+        setTimeout(() => {
+          tutorialModal.classList.remove('hidden');
+          showTutorialSlide(1);
+        }, 500);
+      }
 
       if (!localStorage.getItem('privacyDismissed')) {
         modal.classList.remove('hidden');
@@ -363,17 +692,13 @@
       if (mode === 'visual') {
         visualForm.classList.remove('hidden');
         guidedForm.parentElement.classList.add('hidden');
-        visualModeBtn.classList.add('bg-black', 'text-white');
-        visualModeBtn.classList.remove('hover:bg-gray-50');
-        guidedModeBtn.classList.remove('bg-black', 'text-white');
-        guidedModeBtn.classList.add('hover:bg-gray-50');
+        visualModeBtn.classList.add('active');
+        guidedModeBtn.classList.remove('active');
       } else {
         visualForm.classList.add('hidden');
         guidedForm.parentElement.classList.remove('hidden');
-        guidedModeBtn.classList.add('bg-black', 'text-white');
-        guidedModeBtn.classList.remove('hover:bg-gray-50');
-        visualModeBtn.classList.remove('bg-black', 'text-white');
-        visualModeBtn.classList.add('hover:bg-gray-50');
+        guidedModeBtn.classList.add('active');
+        visualModeBtn.classList.remove('active');
       }
     }
 
@@ -422,7 +747,10 @@
       try {
         const response = await fetch(API_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify({
             messages: conversationHistory,
             target_model: modelSelector.value,
@@ -430,7 +758,11 @@
           })
         });
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API Error:', response.status, errorText);
+          throw new Error(`API error: ${response.status}`);
+        }
         const data = await response.json();
         
         typingBubble.remove();
@@ -439,7 +771,15 @@
       } catch (error) {
         console.error('Error:', error);
         typingBubble.remove();
-        displayAssistantMessage('Sorry, something went wrong. Please try again.');
+        let errorMessage = 'Sorry, something went wrong. ';
+        if (error.message.includes('404')) {
+          errorMessage += 'The API endpoint was not found. Please check your backend is running.';
+        } else if (error.message.includes('Failed to fetch')) {
+          errorMessage += 'Cannot connect to the server. Please check your internet connection.';
+        } else {
+          errorMessage += 'Please try again.';
+        }
+        displayAssistantMessage(errorMessage);
       } finally {
         spinner.classList.add('hidden');
       }
@@ -542,20 +882,45 @@
       }
     }
 
+    function clearChat() {
+      conversationHistory = [];
+      localStorage.removeItem('chatHistory');
+      chatInner.innerHTML = `
+        <div id="placeholder" class="flex flex-col items-center justify-center min-h-[400px] text-center">
+          <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-5xl mb-6">?</div>
+          <h2 class="text-2xl font-semibold text-gray-900 mb-2">Ready to Create Prompts</h2>
+          <p class="text-gray-500 text-sm mb-8">Choose a mode above or try an example below</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
+            <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="blog">
+              <div class="text-2xl mb-2">📝</div>
+              <h3 class="font-semibold text-sm mb-1">Write a Blog Post</h3>
+              <p class="text-xs text-gray-600">Create engaging content about any topic</p>
+            </div>
+            <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="code">
+              <div class="text-2xl mb-2">💻</div>
+              <h3 class="font-semibold text-sm mb-1">Generate Code</h3>
+              <p class="text-xs text-gray-600">Build functions, scripts, or applications</p>
+            </div>
+            <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="marketing">
+              <div class="text-2xl mb-2">🎯</div>
+              <h3 class="font-semibold text-sm mb-1">Marketing Campaign</h3>
+              <p class="text-xs text-gray-600">Design promotional content and strategies</p>
+            </div>
+            <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="email">
+              <div class="text-2xl mb-2">✉️</div>
+              <h3 class="font-semibold text-sm mb-1">Professional Email</h3>
+              <p class="text-xs text-gray-600">Craft clear and effective emails</p>
+            </div>
+          </div>
+        </div>
+        <div id="chat-anchor"></div>
+      `;
+    }
+
     clearChatBtn.addEventListener('click', () => {
       if (confirm('Clear all chat history?')) {
-        conversationHistory = [];
-        localStorage.removeItem('chatHistory');
-        chatInner.innerHTML = `
-          <div id="placeholder" class="flex flex-col items-center justify-center min-h-[400px] text-center">
-            <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-5xl mb-4">
-              ?
-            </div>
-            <h2 class="text-2xl font-semibold text-gray-900 mb-2">Ready to Create Prompts</h2>
-            <p class="text-gray-500 text-sm">Choose a mode and start crafting your AI prompt</p>
-          </div>
-          <div id="chat-anchor"></div>
-        `;
+        clearChat();
       }
     });
   </script>
