@@ -1,32 +1,47 @@
 # backend/core/alchemy_engine.py
 
 from typing import List, Dict, Optional
-# Import paths fixed for Render
 from models.chat_models import ChatMessage
 from services.openrouter_client import get_ai_response
+
+# This is the model YOUR backend uses to generate prompts
+# The user's dropdown selection is separate - it only tells us what LLM to optimize FOR
+PROMPT_GENERATOR_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
 def perform_web_search(query: str) -> str:
     """
     Simulates performing a web search and returning the top results.
     """
     print(f"Performing simulated web search for: {query}")
-    if "gpt" in query.lower():
+    if "gpt" in query.lower() or "openai" in query.lower():
         return """
 - Research Result 1: For GPT models, it's best to be very direct. Place instructions at the beginning of the prompt.
 - Research Result 2: Use separators like '###' to clearly distinguish instructions from context.
 - Research Result 3: Encouraging the model to 'think step-by-step' can improve reasoning on complex tasks.
 """
-    elif "claude" in query.lower():
+    elif "claude" in query.lower() or "anthropic" in query.lower():
         return """
 - Research Result 1: Claude models respond very well to XML tags like <document> and <instructions>.
 - Research Result 2: It's better to tell Claude what to do, rather than what not to do.
 - Research Result 3: Pre-filling the assistant's response can help guide the output format.
 """
-    else: # Default for Gemini and others
+    elif "gemini" in query.lower() or "google" in query.lower():
         return """
 - Research Result 1: Providing a clear 'Persona' is highly effective for Gemini models.
 - Research Result 2: Giving rich context helps Gemini produce more nuanced and accurate responses.
 - Research Result 3: Break down complex tasks into smaller, more manageable steps in the prompt.
+"""
+    elif "llama" in query.lower() or "meta" in query.lower():
+        return """
+- Research Result 1: Llama models work best with clear, structured instructions.
+- Research Result 2: Use markdown formatting to organize complex prompts.
+- Research Result 3: Provide examples in your prompt to guide the model's output.
+"""
+    else:
+        return """
+- Research Result 1: Provide clear context and examples in your prompts.
+- Research Result 2: Structure your prompt with distinct sections for role, task, and constraints.
+- Research Result 3: Be specific about the desired output format.
 """
 
 def create_system_prompt(user_idea: str, target_model: str) -> str:
@@ -99,8 +114,21 @@ async def process_chat_request(messages: List[ChatMessage], model: str, mode: st
                 system_prompt = create_system_prompt(assembled_idea, model)
                 api_messages = [ChatMessage(role="user", content=system_prompt)]
                 
-                # FIXED: Changed to a valid free model
-                raw_response = await get_ai_response(messages=api_messages, model="google/gemini-2.0-flash-exp:free")
+                try:
+                    raw_response = await get_ai_response(messages=api_messages, model=PROMPT_GENERATOR_MODEL)
+                except Exception as e:
+                    error_msg = str(e)
+                    print(f"Error calling OpenRouter: {error_msg}")
+                    if "429" in error_msg:
+                        return {
+                            "expert_prompt": "⚠️ Rate limit reached. Please wait 30-60 seconds and try again.",
+                            "explanation": "The free model tier is experiencing high traffic. Please wait a moment."
+                        }
+                    else:
+                        return {
+                            "expert_prompt": f"⚠️ Error generating prompt: {error_msg}",
+                            "explanation": "An error occurred. Please try again."
+                        }
                 
                 if "---EXPLANATION---" in raw_response:
                     parts = raw_response.split("---EXPLANATION---", 1)
@@ -118,8 +146,21 @@ async def process_chat_request(messages: List[ChatMessage], model: str, mode: st
         system_prompt = create_system_prompt(last_user_message, model)
         api_messages = [ChatMessage(role="user", content=system_prompt)]
         
-        # FIXED: Changed to a valid free model
-        raw_response = await get_ai_response(messages=api_messages, model="google/gemini-2.0-flash-exp:free")
+        try:
+            raw_response = await get_ai_response(messages=api_messages, model=PROMPT_GENERATOR_MODEL)
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Error calling OpenRouter: {error_msg}")
+            if "429" in error_msg:
+                return {
+                    "expert_prompt": "⚠️ Rate limit reached. Please wait 30-60 seconds and try again.",
+                    "explanation": "The free model tier is experiencing high traffic. Please wait a moment."
+                }
+            else:
+                return {
+                    "expert_prompt": f"⚠️ Error generating prompt: {error_msg}",
+                    "explanation": "An error occurred. Please try again."
+                }
         
         expert_prompt = raw_response
         explanation = "No explanation was generated."
