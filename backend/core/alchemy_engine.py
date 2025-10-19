@@ -6,7 +6,7 @@ from services.openrouter_client import get_ai_response
 
 # This is the model YOUR backend uses to generate prompts
 # The user's dropdown selection is separate - it only tells us what LLM to optimize FOR
-PROMPT_GENERATOR_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+PROMPT_GENERATOR_MODEL = "google/gemini-flash-1.5-8b"
 
 def perform_web_search(query: str) -> str:
     """
