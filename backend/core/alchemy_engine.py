@@ -5,10 +5,6 @@ from typing import List, Dict, Optional
 from models.chat_models import ChatMessage
 from services.openrouter_client import get_ai_response
 
-# (The rest of your alchemy_engine.py file is correct and does not need to change)
-# ... paste the rest of your existing alchemy_engine.py code here ...
-# (Make sure the perform_web_search and create_system_prompt functions are included)
-
 def perform_web_search(query: str) -> str:
     """
     Simulates performing a web search and returning the top results.
@@ -102,7 +98,9 @@ async def process_chat_request(messages: List[ChatMessage], model: str, mode: st
                 assembled_idea = f"Role: {role}\nTask: {task}\nContext: {context}\nConstraints: {constraints}"
                 system_prompt = create_system_prompt(assembled_idea, model)
                 api_messages = [ChatMessage(role="user", content=system_prompt)]
-                raw_response = await get_ai_response(messages=api_messages, model="google/gemini-flash-1.5")
+                
+                # FIXED: Changed to a valid free model
+                raw_response = await get_ai_response(messages=api_messages, model="google/gemini-2.0-flash-exp:free")
                 
                 if "---EXPLANATION---" in raw_response:
                     parts = raw_response.split("---EXPLANATION---", 1)
@@ -119,7 +117,9 @@ async def process_chat_request(messages: List[ChatMessage], model: str, mode: st
 
         system_prompt = create_system_prompt(last_user_message, model)
         api_messages = [ChatMessage(role="user", content=system_prompt)]
-        raw_response = await get_ai_response(messages=api_messages, model="google/gemini-flash-1.5")
+        
+        # FIXED: Changed to a valid free model
+        raw_response = await get_ai_response(messages=api_messages, model="google/gemini-2.0-flash-exp:free")
         
         expert_prompt = raw_response
         explanation = "No explanation was generated."
