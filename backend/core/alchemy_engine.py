@@ -4,170 +4,253 @@ from typing import List, Dict, Optional
 from models.chat_models import ChatMessage
 from services.openrouter_client import get_ai_response
 
-# This is the model YOUR backend uses to generate prompts
-# The user's dropdown selection is separate - it only tells us what LLM to optimize FOR
+# ==========================================
+# CONFIGURATION
+# ==========================================
+# You can change this model for higher reliability:
+#    "openai/gpt-4o-mini" or "anthropic/claude-3.5-sonnet"
 PROMPT_GENERATOR_MODEL = "alibaba/tongyi-deepresearch-30b-a3b:free"
 
 
+# ==========================================
+# SIMULATED RESEARCH FETCH
+# ==========================================
 def perform_web_search(query: str) -> str:
     """
-    Simulates performing a web search and returning the top results.
+    Simulates fetching research results about prompt-engineering
+    based on the chosen model.
     """
     print(f"Performing simulated web search for: {query}")
+
     if "gpt" in query.lower() or "openai" in query.lower():
         return """
-- Research Result 1: For GPT models, it's best to be very direct. Place instructions at the beginning of the prompt.
-- Research Result 2: Use separators like '###' to clearly distinguish instructions from context.
-- Research Result 3: Encouraging the model to 'think step-by-step' can improve reasoning on complex tasks.
+- Research Result 1: For GPT models, be explicit — place key instructions first.
+- Research Result 2: Use clear separators (###) to organize information.
+- Research Result 3: Encouraging 'step-by-step reasoning' improves accuracy.
 """
     elif "claude" in query.lower() or "anthropic" in query.lower():
         return """
-- Research Result 1: Claude models respond very well to XML tags like <document> and <instructions>.
-- Research Result 2: It's better to tell Claude what to do, rather than what not to do.
-- Research Result 3: Pre-filling the assistant's response can help guide the output format.
+- Research Result 1: Claude performs best with XML-like tags.
+- Research Result 2: Positive instructions work better than prohibitions.
+- Research Result 3: Pre-filling output format increases adherence.
 """
     elif "gemini" in query.lower() or "google" in query.lower():
         return """
-- Research Result 1: Providing a clear 'Persona' is highly effective for Gemini models.
-- Research Result 2: Giving rich context helps Gemini produce more nuanced and accurate responses.
-- Research Result 3: Break down complex tasks into smaller, more manageable steps in the prompt.
+- Research Result 1: Gemini benefits from persona-based prompts.
+- Research Result 2: More context yields richer, detailed results.
+- Research Result 3: Breaking tasks into substeps improves coherence.
 """
     elif "llama" in query.lower() or "meta" in query.lower():
         return """
-- Research Result 1: Llama models work best with clear, structured instructions.
-- Research Result 2: Use markdown formatting to organize complex prompts.
-- Research Result 3: Provide examples in your prompt to guide the model's output.
+- Research Result 1: Llama models excel with structured markdown layouts.
+- Research Result 2: Examples and constraints enhance reliability.
+- Research Result 3: Explicit formatting guidance reduces drift.
 """
     else:
         return """
-- Research Result 1: Provide clear context and examples in your prompts.
-- Research Result 2: Structure your prompt with distinct sections for role, task, and constraints.
-- Research Result 3: Be specific about the desired output format.
+- Research Result 1: Provide role, task, and constraints distinctly.
+- Research Result 2: Include background context for relevance.
+- Research Result 3: Define a clear expected output format.
 """
 
+
+# ==========================================
+# SYSTEM PROMPT CREATION
+# ==========================================
 def create_system_prompt(user_idea: str, target_model: str) -> str:
     """
-    Creates the master system prompt. It now performs a web search
-    for the latest prompting techniques to include in its instructions.
+    Creates a consistent, explicit system prompt that instructs
+    the AI to output a fully structured and formatted expert prompt.
     """
     search_query = f"latest prompting techniques for {target_model}"
     latest_research = perform_web_search(search_query)
+
     system_prompt = f"""
-You are 'Prompt Alchemist', a world-class AI assistant that creates expert-level prompts.
+You are 'Prompt Alchemist' — a world-class AI that designs perfectly structured prompts
+optimized for language models like {target_model}.
 
-**Your Task:**
-Your goal is to convert the user's idea into a high-quality, structured prompt that is perfectly optimized for the '{target_model}' AI model. You must use the latest research to inform your prompt structure.
+---
 
-**Latest Research Findings:**
-<research>
-{latest_research}
-</research>
+### OBJECTIVE
+Transform the user's idea into a **professionally structured, research-driven prompt**
+that strictly follows the format below.
 
-**User's Core Idea:**
-<idea>
-{user_idea}
-</idea>
+---
 
-**Instructions:**
-1.  **Analyze:** Read the user's idea and the latest research findings.
-2.  **Synthesize:** Combine the user's goal with the best practices from your research.
-3.  **Construct:** Build a new, detailed prompt. It must include a clear 'Role', 'Task', 'Context', 'Format', and 'Constraints'. The structure of the prompt should reflect the best practices you found in your research.
+### REQUIRED OUTPUT FORMAT
 
-**Final Output Structure:**
-First, write the complete, expertly crafted prompt.
-Then, on a new line, write the separator "---EXPLANATION---".
-Finally, in your explanation, you MUST mention how you used one of the specific findings from your web research to make the prompt better.
+### Prompt
+**Role:** [Define the AI’s persona or area of expertise]
+**Task:** [Describe the exact goal or action clearly]
+**Context:** [Provide relevant background, environment, or audience details]
+**Constraints:** [List rules, limitations, or style restrictions]
+
+**Output Format:**
+```markdown
+### Solution Matrix
+| Solution | Feasibility | Risk | Efficiency |
+|-----------|-------------|------|-------------|
+
+### Recommended Path
+[2–3 paragraph justification with supporting evidence]
+EXPLANATION
+After the prompt, include a short "EXPLANATION" section
+explaining how you used the latest research findings to craft the prompt.
+Mention at least one specific research insight.
+
+RESEARCH FOR YOUR REFERENCE
+<research> {latest_research} </research>
+USER INPUT
+<idea> {user_idea} </idea>
+RULES
+Always begin with “### Prompt”
+
+Always end with “---EXPLANATION---”
+
+Do NOT include JSON, code blocks, or extra commentary.
+
+Never omit any of the sections.
+
+Keep explanations under 4 sentences.
 """
     return system_prompt
 
+# ==========================================
+# CORE LOGIC — PROCESS CHAT REQUEST
+# ==========================================
 async def process_chat_request(messages: List[ChatMessage], model: str, mode: str) -> Dict[str, str]:
     """
-    Processes a chat request based on the current mode.
+    Processes user interactions and generates final expert prompts.
+    Supports both Guided and Visual Builder modes.
     """
     if not messages:
         return {"expert_prompt": "Error: No user message found.", "explanation": ""}
 
-    if mode == 'guided':
+    # ---------------------------
+    # GUIDED MODE: step-by-step
+    # ---------------------------
+    if mode == "guided":
         last_assistant_message: Optional[str] = None
         for i in range(len(messages) - 2, -1, -1):
-            if messages[i].role == 'assistant':
+            if messages[i].role == "assistant":
                 if isinstance(messages[i].content, dict):
-                    last_assistant_message = messages[i].content.get('expert_prompt', '')
+                    last_assistant_message = messages[i].content.get("expert_prompt", "")
                 else:
                     last_assistant_message = messages[i].content
                 break
 
+        # Conversation flow logic
         if last_assistant_message is None or "start over" in last_assistant_message:
-            return { "expert_prompt": "Hello! I'm the Prompt Alchemist. To start, what's your main goal or idea?", "explanation": "This is the first step of our guided interview." }
+            return {
+                "expert_prompt": "Hello! I'm the Prompt Alchemist. Let's get started. What's your main goal or idea?",
+                "explanation": "This begins the guided prompt creation process.",
+            }
         elif "goal or idea" in last_assistant_message:
-            return { "expert_prompt": "Got it. Now, what role should the AI take on? (e.g., 'a marketing expert', 'a python developer')", "explanation": "Defining a role gives the AI better focus." }
+            return {
+                "expert_prompt": "Got it. What role should the AI take on? (e.g., 'marketing expert', 'data scientist')",
+                "explanation": "Roles help tailor the AI’s persona for precision.",
+            }
         elif "role should the AI take on" in last_assistant_message:
-            return { "expert_prompt": "Perfect. What is the specific task you want the AI to perform?", "explanation": "A clear task leads to a more precise result." }
-        elif "specific task" in last_assistant_message:
-            return { "expert_prompt": "Great. Is there any important context, background, or details to include?", "explanation": "Context helps the AI understand the full picture." }
-        elif "context, background, or details" in last_assistant_message:
-            return { "expert_prompt": "Almost done. Are there any constraints, rules, or specific output formats? (e.g., 'keep it under 100 words', 'respond in JSON')", "explanation": "Constraints help guide the final output." }
+            return {
+                "expert_prompt": "Perfect. What’s the main task or objective you want the AI to accomplish?",
+                "explanation": "A well-defined task ensures targeted prompt generation.",
+            }
+        elif "main task" in last_assistant_message:
+            return {
+                "expert_prompt": "Good. Can you share any relevant context or background details?",
+                "explanation": "Context adds clarity and relevance to the final prompt.",
+            }
+        elif "context" in last_assistant_message:
+            return {
+                "expert_prompt": "Almost done. Are there any specific constraints or formatting requirements?",
+                "explanation": "Constraints refine the AI’s creative boundaries.",
+            }
         else:
-            user_answers = [msg.content for msg in messages if msg.role == 'user']
+            # Collect all user responses
+            user_answers = [msg.content for msg in messages if msg.role == "user"]
             if len(user_answers) >= 5:
+                # Assuming the last 5 user messages are: idea, role, task, context, constraints
                 idea, role, task, context, constraints = user_answers[-5:]
                 assembled_idea = f"Role: {role}\nTask: {task}\nContext: {context}\nConstraints: {constraints}"
                 system_prompt = create_system_prompt(assembled_idea, model)
                 api_messages = [ChatMessage(role="user", content=system_prompt)]
-                
+
                 try:
                     raw_response = await get_ai_response(messages=api_messages, model=PROMPT_GENERATOR_MODEL)
                 except Exception as e:
                     error_msg = str(e)
-                    print(f"Error calling OpenRouter: {error_msg}")
+                    print(f"Error calling model: {error_msg}")
                     if "429" in error_msg:
                         return {
-                            "expert_prompt": "⚠️ Rate limit reached. Please wait 30-60 seconds and try again.",
-                            "explanation": "The free model tier is experiencing high traffic. Please wait a moment."
+                            "expert_prompt": "⚠️ Rate limit reached. Please wait and retry shortly.",
+                            "explanation": "Free-tier congestion detected; please retry.",
                         }
-                    else:
-                        return {
-                            "expert_prompt": f"⚠️ Error generating prompt: {error_msg}",
-                            "explanation": "An error occurred. Please try again."
-                        }
-                
+                    return {
+                        "expert_prompt": f"⚠️ Error generating prompt: {error_msg}",
+                        "explanation": "Unexpected API or network error occurred.",
+                    }
+
+                # Enforce consistent formatting
+                if not raw_response.strip().startswith("### Prompt"):
+                    raw_response = "### Prompt\n" + raw_response.strip()
+                if "---EXPLANATION---" not in raw_response:
+                    raw_response += "\n\n---EXPLANATION---\nAutomatically formatted for consistency."
+
                 if "---EXPLANATION---" in raw_response:
                     parts = raw_response.split("---EXPLANATION---", 1)
-                    return { "expert_prompt": f"Great, I have everything I need! Here is the final prompt I've constructed for you:\n\n{parts[0].strip()}", "explanation": parts[1].strip() }
-                else:
-                     return { "expert_prompt": f"Great, I have everything I need! Here is the final prompt I've constructed for you:\n\n{raw_response}", "explanation": "The final prompt is ready." }
-            else:
-                 return {"expert_prompt": "Something went wrong in the conversation. Let's start over. What's your main goal?", "explanation": "Conversation restarted."}
-    
-    else: # Visual Builder Mode
+                    # Removed the "Great! Here's the final structured prompt:\n\n" prefix for a cleaner final output
+                    return {
+                        "expert_prompt": parts[0].strip(),
+                        "explanation": parts[1].strip(),
+                    }
+
+                return {
+                    "expert_prompt": raw_response,
+                    "explanation": "Final prompt generated successfully.",
+                }
+
+            # If conversation logic fails
+            return {
+                "expert_prompt": "Something went wrong. Let's start again. What's your main goal?",
+                "explanation": "Conversation restarted to ensure accuracy.",
+            }
+
+    # ---------------------------
+    # VISUAL BUILDER MODE
+    # ---------------------------
+    else:
         last_user_message = ""
         if isinstance(messages[-1].content, str):
             last_user_message = messages[-1].content
 
         system_prompt = create_system_prompt(last_user_message, model)
         api_messages = [ChatMessage(role="user", content=system_prompt)]
-        
+
         try:
             raw_response = await get_ai_response(messages=api_messages, model=PROMPT_GENERATOR_MODEL)
         except Exception as e:
             error_msg = str(e)
-            print(f"Error calling OpenRouter: {error_msg}")
+            print(f"Error calling model: {error_msg}")
             if "429" in error_msg:
                 return {
-                    "expert_prompt": "⚠️ Rate limit reached. Please wait 30-60 seconds and try again.",
-                    "explanation": "The free model tier is experiencing high traffic. Please wait a moment."
+                    "expert_prompt": "⚠️ Rate limit reached. Please try again later.",
+                    "explanation": "Free-tier API overload detected.",
                 }
-            else:
-                return {
-                    "expert_prompt": f"⚠️ Error generating prompt: {error_msg}",
-                    "explanation": "An error occurred. Please try again."
-                }
-        
-        expert_prompt = raw_response
-        explanation = "No explanation was generated."
+            return {
+                "expert_prompt": f"⚠️ Error generating prompt: {error_msg}",
+                "explanation": "Unexpected backend or network error occurred.",
+            }
+
+        # Enforce structure if missing
+        if not raw_response.strip().startswith("### Prompt"):
+            raw_response = "### Prompt\n" + raw_response.strip()
+        if "---EXPLANATION---" not in raw_response:
+            raw_response += "\n\n---EXPLANATION---\nAutomatically formatted for consistency."
+
+        expert_prompt, explanation = raw_response, "No explanation provided."
         if "---EXPLANATION---" in raw_response:
             parts = raw_response.split("---EXPLANATION---", 1)
             expert_prompt = parts[0].strip()
             explanation = parts[1].strip()
 
-        return { "expert_prompt": expert_prompt, "explanation": explanation }
+        return {"expert_prompt": expert_prompt, "explanation": explanation}
