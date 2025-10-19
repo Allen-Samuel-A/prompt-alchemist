@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>What To Prompt? - AI Prompt Engineering</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -39,7 +39,14 @@
       padding: 0.875rem 1rem;
       border-radius: 1rem 1rem 0.25rem 1rem;
       margin-left: auto;
-      max-width: 80%;
+      max-width: 85%;
+    }
+
+    @media (max-width: 640px) {
+      .user-bubble {
+        max-width: 90%;
+        padding: 0.75rem 0.875rem;
+      }
     }
 
     .assistant-bubble {
@@ -48,7 +55,14 @@
       padding: 0.875rem 1rem;
       border-radius: 1rem 1rem 1rem 0.25rem;
       margin-right: auto;
-      max-width: 80%;
+      max-width: 85%;
+    }
+
+    @media (max-width: 640px) {
+      .assistant-bubble {
+        max-width: 90%;
+        padding: 0.75rem 0.875rem;
+      }
     }
 
     .typing-indicator {
@@ -104,6 +118,12 @@
       letter-spacing: 0.01em;
     }
 
+    @media (max-width: 640px) {
+      pre {
+        font-size: 14px;
+      }
+    }
+
     ::-webkit-scrollbar {
       width: 6px;
     }
@@ -121,15 +141,59 @@
       background: #9ca3af;
     }
 
+    /* Desktop sidebar */
     .sidebar {
       width: 320px;
       min-width: 320px;
+      transition: transform 0.3s ease;
     }
 
+    /* Mobile sidebar - hidden by default, slides in */
     @media (max-width: 768px) {
       .sidebar {
-        width: 100%;
-        min-width: 100%;
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 280px;
+        min-width: 280px;
+        z-index: 100;
+        transform: translateX(-100%);
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      }
+
+      .sidebar.mobile-open {
+        transform: translateX(0);
+      }
+
+      .mobile-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 99;
+      }
+
+      .mobile-overlay.active {
+        display: block;
+      }
+
+      .mobile-menu-btn {
+        display: flex;
+      }
+
+      .desktop-only {
+        display: none !important;
+      }
+    }
+
+    @media (min-width: 769px) {
+      .mobile-menu-btn {
+        display: none;
+      }
+      
+      .mobile-only {
+        display: none !important;
       }
     }
 
@@ -173,6 +237,12 @@
       opacity: 1;
     }
 
+    @media (max-width: 768px) {
+      .tooltip .tooltiptext {
+        display: none;
+      }
+    }
+
     #scroll-to-top {
       transition: all 0.3s ease;
     }
@@ -180,6 +250,19 @@
     #scroll-to-top.show {
       opacity: 1;
       pointer-events: auto;
+    }
+
+    @media (max-width: 640px) {
+      #scroll-to-top {
+        bottom: 80px;
+        right: 16px;
+        padding: 0.625rem;
+      }
+      
+      #scroll-to-top svg {
+        width: 20px;
+        height: 20px;
+      }
     }
 
     .tutorial-slide {
@@ -208,6 +291,12 @@
       border-color: #9ca3af;
     }
 
+    @media (max-width: 640px) {
+      .template-card:active {
+        transform: scale(0.98);
+      }
+    }
+
     .kbd {
       background: #f3f4f6;
       border: 1px solid #d1d5db;
@@ -217,7 +306,6 @@
       font-family: monospace;
     }
 
-    /* Fix for guided mode button hover */
     .mode-btn {
       transition: all 0.2s ease;
     }
@@ -230,23 +318,44 @@
     .mode-btn:not(.active):hover {
       background: #f9fafb;
     }
+
+    /* Mobile bottom input bar */
+    @media (max-width: 768px) {
+      .mobile-input-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 1px solid #e5e7eb;
+        padding: 12px;
+        z-index: 50;
+      }
+
+      .chat-container-mobile {
+        padding-bottom: 80px;
+      }
+    }
   </style>
 </head>
 <body class="bg-white h-screen flex flex-col overflow-hidden">
 
+  <!-- Mobile Overlay -->
+  <div id="mobile-overlay" class="mobile-overlay"></div>
+
   <!-- Tutorial Modal -->
-  <div id="tutorial-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden">
-      <div id="tutorial-content" class="p-8">
+  <div id="tutorial-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden px-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
+      <div id="tutorial-content" class="p-6 md:p-8">
         <div class="tutorial-slide" data-slide="1">
           <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-4xl mb-6 mx-auto">?</div>
-          <h2 class="text-3xl font-bold text-center mb-4">Welcome to What To Prompt!</h2>
-          <p class="text-gray-600 text-center mb-6">Learn how to create amazing AI prompts in just a few steps. This quick guide will show you everything you need to know!</p>
+          <h2 class="text-2xl md:text-3xl font-bold text-center mb-4">Welcome to What To Prompt!</h2>
+          <p class="text-gray-600 text-center mb-6 text-sm md:text-base">Learn how to create amazing AI prompts in just a few steps. This quick guide will show you everything you need to know!</p>
           <div class="text-center text-sm text-gray-500">Slide 1 of 4</div>
         </div>
         <div class="tutorial-slide hidden" data-slide="2">
           <div class="text-5xl text-center mb-6">🎨</div>
-          <h2 class="text-2xl font-bold text-center mb-4">Choose Your Mode</h2>
+          <h2 class="text-xl md:text-2xl font-bold text-center mb-4">Choose Your Mode</h2>
           <div class="space-y-4 mb-6">
             <div class="p-4 bg-gray-50 rounded-lg">
               <h3 class="font-semibold mb-2">📝 Visual Builder</h3>
@@ -261,8 +370,8 @@
         </div>
         <div class="tutorial-slide hidden" data-slide="3">
           <div class="text-5xl text-center mb-6">⚡</div>
-          <h2 class="text-2xl font-bold text-center mb-4">Try Example Templates</h2>
-          <p class="text-gray-600 text-center mb-4">Click any example template to get started instantly!</p>
+          <h2 class="text-xl md:text-2xl font-bold text-center mb-4">Try Example Templates</h2>
+          <p class="text-gray-600 text-center mb-4 text-sm md:text-base">Click any example template to get started instantly!</p>
           <div class="bg-gray-50 rounded-lg p-4 mb-6">
             <ul class="text-sm text-gray-700 space-y-2">
               <li>• Write blog posts and articles</li>
@@ -275,8 +384,8 @@
         </div>
         <div class="tutorial-slide hidden" data-slide="4">
           <div class="text-5xl text-center mb-6">⌨️</div>
-          <h2 class="text-2xl font-bold text-center mb-4">Keyboard Shortcuts</h2>
-          <p class="text-gray-600 text-center mb-4">Work faster with these shortcuts:</p>
+          <h2 class="text-xl md:text-2xl font-bold text-center mb-4">Keyboard Shortcuts</h2>
+          <p class="text-gray-600 text-center mb-4 text-sm md:text-base">Work faster with these shortcuts:</p>
           <div class="bg-gray-50 rounded-lg p-4 mb-6 space-y-2 text-sm">
             <div class="flex justify-between items-center">
               <span>Send message</span>
@@ -290,21 +399,21 @@
           <div class="text-center text-sm text-gray-500">Slide 4 of 4</div>
         </div>
       </div>
-      <div class="bg-gray-50 px-8 py-4 flex items-center justify-between border-t">
-        <button id="tutorial-skip" class="text-sm text-gray-600 hover:text-black font-medium">Skip Tutorial</button>
+      <div class="bg-gray-50 px-6 md:px-8 py-4 flex items-center justify-between border-t">
+        <button id="tutorial-skip" class="text-sm text-gray-600 hover:text-black font-medium">Skip</button>
         <div class="flex gap-2">
-          <button id="tutorial-prev" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 font-medium hidden">Previous</button>
-          <button id="tutorial-next" class="px-6 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 font-medium">Next</button>
+          <button id="tutorial-prev" class="px-3 md:px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 font-medium hidden">Previous</button>
+          <button id="tutorial-next" class="px-4 md:px-6 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 font-medium">Next</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Privacy Modal -->
-  <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
-    <div class="bg-white p-8 rounded-lg shadow-2xl max-w-md w-full mx-4">
-      <h2 class="text-2xl font-semibold mb-3">Privacy Notice</h2>
-      <p class="text-gray-600 mb-6">⚠️ Please do not share personal, financial, or password information. This tool is for safe prompt generation only.</p>
+  <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden px-4">
+    <div class="bg-white p-6 md:p-8 rounded-lg shadow-2xl max-w-md w-full">
+      <h2 class="text-xl md:text-2xl font-semibold mb-3">Privacy Notice</h2>
+      <p class="text-gray-600 mb-6 text-sm md:text-base">⚠️ Please do not share personal, financial, or password information. This tool is for safe prompt generation only.</p>
       <div class="flex items-center mb-6">
         <input type="checkbox" id="dismiss-forever" class="w-4 h-4 rounded focus:ring-gray-500" />
         <label for="dismiss-forever" class="ml-2 text-sm text-gray-600">Don't show this again</label>
@@ -321,22 +430,29 @@
   </button>
 
   <!-- Header -->
-  <header class="border-b border-gray-200 bg-white">
-    <div class="px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-2xl">?</div>
+  <header class="border-b border-gray-200 bg-white flex-shrink-0">
+    <div class="px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+      <div class="flex items-center gap-2 md:gap-3">
+        <!-- Mobile Menu Button -->
+        <button id="mobile-menu-btn" class="mobile-menu-btn p-2 -ml-2 text-gray-600 hover:text-black md:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        
+        <div class="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-xl md:text-2xl">?</div>
         <div>
-          <h1 class="text-xl font-semibold">What To Prompt?</h1>
-          <p class="text-xs text-gray-500">AI-Powered Prompt Engineering</p>
+          <h1 class="text-base md:text-xl font-semibold">What To Prompt?</h1>
+          <p class="text-xs text-gray-500 hidden sm:block">AI-Powered Prompt Engineering</p>
         </div>
       </div>
-      <button id="help-btn" class="text-gray-600 hover:text-black text-sm font-medium">Help</button>
+      <button id="help-btn" class="text-gray-600 hover:text-black text-xs md:text-sm font-medium">Help</button>
     </div>
   </header>
 
   <!-- Help Drawer -->
-  <div id="help-drawer" class="hidden fixed right-4 top-20 bg-white rounded-lg shadow-xl border border-gray-200 p-6 w-80 z-50">
-    <h3 class="font-semibold text-lg mb-3">Keyboard Shortcuts</h3>
+  <div id="help-drawer" class="hidden fixed right-4 top-16 md:top-20 bg-white rounded-lg shadow-xl border border-gray-200 p-4 md:p-6 w-72 md:w-80 z-50">
+    <h3 class="font-semibold text-base md:text-lg mb-3">Keyboard Shortcuts</h3>
     <div class="space-y-2 text-sm text-gray-600 mb-4">
       <div class="flex justify-between"><span>Send message</span><span class="kbd">Ctrl+Enter</span></div>
       <div class="flex justify-between"><span>Clear chat</span><span class="kbd">Ctrl+K</span></div>
@@ -348,14 +464,24 @@
   <!-- Main Layout -->
   <div class="flex flex-1 overflow-hidden">
     <!-- Left Sidebar -->
-    <div class="sidebar border-r border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
-      <div class="p-4 flex-shrink-0 overflow-y-auto">
+    <div id="sidebar" class="sidebar border-r border-gray-200 bg-gray-50 flex flex-col overflow-hidden">
+      <!-- Close button for mobile -->
+      <div class="mobile-only p-4 border-b border-gray-200 flex items-center justify-between">
+        <span class="font-semibold">Menu</span>
+        <button id="close-sidebar-btn" class="p-2 text-gray-600 hover:text-black">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-4 flex-shrink-0 overflow-y-auto flex-1">
         <!-- Mode Switcher -->
         <div class="mb-6">
           <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Mode</label>
           <div class="flex rounded-lg bg-white border border-gray-200 overflow-hidden">
-            <button type="button" id="visual-mode-btn" class="mode-btn flex-1 px-4 py-2.5 text-sm font-medium border-r border-gray-200">Visual</button>
-            <button type="button" id="guided-mode-btn" class="mode-btn active flex-1 px-4 py-2.5 text-sm font-medium">Guided</button>
+            <button type="button" id="visual-mode-btn" class="mode-btn flex-1 px-3 md:px-4 py-2.5 text-sm font-medium border-r border-gray-200">Visual</button>
+            <button type="button" id="guided-mode-btn" class="mode-btn active flex-1 px-3 md:px-4 py-2.5 text-sm font-medium">Guided</button>
           </div>
         </div>
 
@@ -364,7 +490,7 @@
           <div>
             <div class="flex items-center gap-1 mb-2">
               <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</label>
-              <div class="tooltip">
+              <div class="tooltip desktop-only">
                 <span class="text-gray-400 cursor-help text-xs">?</span>
                 <span class="tooltiptext">What role should the AI act as? e.g., "Senior Developer", "Marketing Expert"</span>
               </div>
@@ -374,7 +500,7 @@
           <div>
             <div class="flex items-center gap-1 mb-2">
               <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Task *</label>
-              <div class="tooltip">
+              <div class="tooltip desktop-only">
                 <span class="text-gray-400 cursor-help text-xs">?</span>
                 <span class="tooltiptext">What do you want the AI to do? Be specific about the main goal.</span>
               </div>
@@ -384,7 +510,7 @@
           <div>
             <div class="flex items-center gap-1 mb-2">
               <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Context</label>
-              <div class="tooltip">
+              <div class="tooltip desktop-only">
                 <span class="text-gray-400 cursor-help text-xs">?</span>
                 <span class="tooltiptext">Background information or details that help the AI understand your needs better.</span>
               </div>
@@ -394,7 +520,7 @@
           <div>
             <div class="flex items-center gap-1 mb-2">
               <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Constraints</label>
-              <div class="tooltip">
+              <div class="tooltip desktop-only">
                 <span class="text-gray-400 cursor-help text-xs">?</span>
                 <span class="tooltiptext">Any limitations or requirements? e.g., "Use only vanilla JavaScript", "Keep under 100 words"</span>
               </div>
@@ -404,8 +530,8 @@
           <button type="submit" class="w-full gradient-btn text-white px-4 py-3 rounded-md font-medium text-sm">Generate Prompt</button>
         </form>
 
-        <!-- Guided Form -->
-        <div id="guided-form-container">
+        <!-- Guided Form - Desktop -->
+        <div id="guided-form-container" class="desktop-only">
           <form id="guided-form" class="relative">
             <input id="guided-input" type="text" class="w-full px-4 py-3 pr-12 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition" placeholder="Type your idea..." />
             <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 bg-black text-white rounded p-2 hover:bg-gray-800 transition">
@@ -429,7 +555,7 @@
       </div>
 
       <!-- Controls -->
-      <div class="mt-auto p-4 border-t border-gray-200 bg-white space-y-3">
+      <div class="mt-auto p-4 border-t border-gray-200 bg-white space-y-3 flex-shrink-0">
         <div>
           <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">AI Model</label>
           <select id="model-selector" class="w-full px-3 py-2 text-sm rounded-md border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition bg-white">
@@ -446,32 +572,32 @@
 
     <!-- Right Chat Area -->
     <div class="flex-1 flex flex-col overflow-hidden bg-white">
-      <div id="chat-container" class="flex-1 overflow-y-auto px-8 py-6">
+      <div id="chat-container" class="flex-1 overflow-y-auto px-4 md:px-8 py-4 md:py-6 chat-container-mobile">
         <div class="max-w-4xl mx-auto">
           <div id="chat-inner" class="flex flex-col gap-3">
-            <div id="placeholder" class="flex flex-col items-center justify-center min-h-[400px] text-center">
-              <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-5xl mb-6">?</div>
-              <h2 class="text-2xl font-semibold text-gray-900 mb-2">Ready to Create Prompts</h2>
-              <p class="text-gray-500 text-sm mb-8">Choose a mode above or try an example below</p>
+            <div id="placeholder" class="flex flex-col items-center justify-center min-h-[300px] md:min-h-[400px] text-center px-4">
+              <div class="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-4xl md:text-5xl mb-4 md:mb-6">?</div>
+              <h2 class="text-xl md:text-2xl font-semibold text-gray-900 mb-2">Ready to Create Prompts</h2>
+              <p class="text-gray-500 text-sm mb-6 md:mb-8">Choose a mode above or try an example below</p>
               
               <!-- Example Templates -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
-                <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="blog">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
+                <div class="template-card p-3 md:p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="blog">
                   <div class="text-2xl mb-2">📝</div>
                   <h3 class="font-semibold text-sm mb-1">Write a Blog Post</h3>
                   <p class="text-xs text-gray-600">Create engaging content about any topic</p>
                 </div>
-                <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="code">
+                <div class="template-card p-3 md:p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="code">
                   <div class="text-2xl mb-2">💻</div>
                   <h3 class="font-semibold text-sm mb-1">Generate Code</h3>
                   <p class="text-xs text-gray-600">Build functions, scripts, or applications</p>
                 </div>
-                <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="marketing">
+                <div class="template-card p-3 md:p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="marketing">
                   <div class="text-2xl mb-2">🎯</div>
                   <h3 class="font-semibold text-sm mb-1">Marketing Campaign</h3>
                   <p class="text-xs text-gray-600">Design promotional content and strategies</p>
                 </div>
-                <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="email">
+                <div class="template-card p-3 md:p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="email">
                   <div class="text-2xl mb-2">✉️</div>
                   <h3 class="font-semibold text-sm mb-1">Professional Email</h3>
                   <p class="text-xs text-gray-600">Craft clear and effective emails</p>
@@ -483,8 +609,20 @@
         </div>
       </div>
 
-      <!-- Footer -->
-      <footer class="border-t border-gray-200 py-3 px-8 bg-gray-50">
+      <!-- Mobile Input Bar -->
+      <div class="mobile-input-container mobile-only">
+        <form id="guided-form-mobile" class="relative">
+          <input id="guided-input-mobile" type="text" class="w-full px-4 py-3 pr-12 text-sm rounded-lg border border-gray-300 focus:border-black focus:ring-1 focus:ring-black transition" placeholder="Type your idea..." />
+          <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 bg-black text-white rounded p-2 hover:bg-gray-800 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </button>
+        </form>
+      </div>
+
+      <!-- Footer - Desktop only -->
+      <footer class="desktop-only border-t border-gray-200 py-3 px-8 bg-gray-50">
         <div class="max-w-4xl mx-auto flex items-center justify-center gap-2 text-xs text-gray-600">
           <span>© 2025</span>
           <a href="http://allensamuel.me/" target="_blank" class="font-medium hover:text-black transition">Allen Samuel</a>
@@ -502,11 +640,13 @@
     const chatInner = document.getElementById('chat-inner');
     const visualForm = document.getElementById('visual-form');
     const guidedForm = document.getElementById('guided-form');
+    const guidedFormMobile = document.getElementById('guided-form-mobile');
     const roleInput = document.getElementById('role-input');
     const taskInput = document.getElementById('task-input');
     const contextInput = document.getElementById('context-input');
     const constraintsInput = document.getElementById('constraints-input');
     const guidedInput = document.getElementById('guided-input');
+    const guidedInputMobile = document.getElementById('guided-input-mobile');
     const visualModeBtn = document.getElementById('visual-mode-btn');
     const guidedModeBtn = document.getElementById('guided-mode-btn');
     const modelSelector = document.getElementById('model-selector');
@@ -516,6 +656,34 @@
     const helpDrawer = document.getElementById('help-drawer');
     const scrollToTopBtn = document.getElementById('scroll-to-top');
     const chatContainer = document.getElementById('chat-container');
+    
+    // Mobile menu elements
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    const sidebar = document.getElementById('sidebar');
+    const mobileOverlay = document.getElementById('mobile-overlay');
+
+    // Mobile menu functionality
+    if (mobileMenuBtn) {
+      mobileMenuBtn.addEventListener('click', () => {
+        sidebar.classList.add('mobile-open');
+        mobileOverlay.classList.add('active');
+      });
+    }
+
+    if (closeSidebarBtn) {
+      closeSidebarBtn.addEventListener('click', () => {
+        sidebar.classList.remove('mobile-open');
+        mobileOverlay.classList.remove('active');
+      });
+    }
+
+    if (mobileOverlay) {
+      mobileOverlay.addEventListener('click', () => {
+        sidebar.classList.remove('mobile-open');
+        mobileOverlay.classList.remove('active');
+      });
+    }
 
     // Template data
     const templates = {
@@ -590,7 +758,7 @@
         if (currentMode === 'visual') {
           visualForm.dispatchEvent(new Event('submit'));
         } else {
-          guidedForm.dispatchEvent(new Event('submit'));
+          if (guidedForm) guidedForm.dispatchEvent(new Event('submit'));
         }
       }
       
@@ -616,6 +784,10 @@
           taskInput.value = template.task;
           contextInput.value = template.context;
           constraintsInput.value = template.constraints;
+          
+          // Close mobile menu if open
+          sidebar.classList.remove('mobile-open');
+          mobileOverlay.classList.remove('active');
           
           // Focus on the first input
           setTimeout(() => roleInput.focus(), 100);
@@ -691,19 +863,30 @@
 
       if (mode === 'visual') {
         visualForm.classList.remove('hidden');
-        guidedForm.parentElement.classList.add('hidden');
+        if (guidedForm) guidedForm.parentElement.classList.add('hidden');
         visualModeBtn.classList.add('active');
         guidedModeBtn.classList.remove('active');
       } else {
         visualForm.classList.add('hidden');
-        guidedForm.parentElement.classList.remove('hidden');
+        if (guidedForm) guidedForm.parentElement.classList.remove('hidden');
         guidedModeBtn.classList.add('active');
         visualModeBtn.classList.remove('active');
       }
     }
 
-    visualModeBtn.addEventListener('click', () => setMode('visual'));
-    guidedModeBtn.addEventListener('click', () => setMode('guided'));
+    visualModeBtn.addEventListener('click', () => {
+      setMode('visual');
+      // Close mobile menu
+      sidebar.classList.remove('mobile-open');
+      mobileOverlay.classList.remove('active');
+    });
+    
+    guidedModeBtn.addEventListener('click', () => {
+      setMode('guided');
+      // Close mobile menu
+      sidebar.classList.remove('mobile-open');
+      mobileOverlay.classList.remove('active');
+    });
 
     visualForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -719,16 +902,32 @@
       contextInput.value = '';
       constraintsInput.value = '';
 
+      // Close mobile menu
+      sidebar.classList.remove('mobile-open');
+      mobileOverlay.classList.remove('active');
+
       await processMessage(userIdea);
     });
 
-    guidedForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const userMessage = guidedInput.value.trim();
-      if (!userMessage) return;
-      guidedInput.value = '';
-      await processMessage(userMessage);
-    });
+    if (guidedForm) {
+      guidedForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userMessage = guidedInput.value.trim();
+        if (!userMessage) return;
+        guidedInput.value = '';
+        await processMessage(userMessage);
+      });
+    }
+
+    if (guidedFormMobile) {
+      guidedFormMobile.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userMessage = guidedInputMobile.value.trim();
+        if (!userMessage) return;
+        guidedInputMobile.value = '';
+        await processMessage(userMessage);
+      });
+    }
 
     async function processMessage(userContent) {
       removePlaceholder();
@@ -743,6 +942,15 @@
       autoScroll();
 
       spinner.classList.remove('hidden');
+
+      // Debug: Log what we're sending
+      console.log('=== API Request Debug ===');
+      console.log('URL:', API_URL);
+      console.log('Mode:', currentMode);
+      console.log('Model:', modelSelector.value);
+      console.log('Conversation Length:', conversationHistory.length);
+      console.log('Last 2 messages:', conversationHistory.slice(-2));
+      console.log('========================');
 
       try {
         const response = await fetch(API_URL, {
@@ -760,7 +968,16 @@
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('API Error:', response.status, errorText);
+          console.error('=== API Error Details ===');
+          console.error('Status:', response.status);
+          console.error('Status Text:', response.statusText);
+          console.error('Response Body:', errorText);
+          console.error('Request Body was:', JSON.stringify({
+            messages: conversationHistory,
+            target_model: modelSelector.value,
+            mode: currentMode
+          }, null, 2));
+          console.error('========================');
           throw new Error(`API error: ${response.status}`);
         }
         const data = await response.json();
@@ -886,28 +1103,28 @@
       conversationHistory = [];
       localStorage.removeItem('chatHistory');
       chatInner.innerHTML = `
-        <div id="placeholder" class="flex flex-col items-center justify-center min-h-[400px] text-center">
-          <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-5xl mb-6">?</div>
-          <h2 class="text-2xl font-semibold text-gray-900 mb-2">Ready to Create Prompts</h2>
-          <p class="text-gray-500 text-sm mb-8">Choose a mode above or try an example below</p>
+        <div id="placeholder" class="flex flex-col items-center justify-center min-h-[300px] md:min-h-[400px] text-center px-4">
+          <div class="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-bold text-4xl md:text-5xl mb-4 md:mb-6">?</div>
+          <h2 class="text-xl md:text-2xl font-semibold text-gray-900 mb-2">Ready to Create Prompts</h2>
+          <p class="text-gray-500 text-sm mb-6 md:mb-8">Choose a mode above or try an example below</p>
           
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
-            <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="blog">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
+            <div class="template-card p-3 md:p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="blog">
               <div class="text-2xl mb-2">📝</div>
               <h3 class="font-semibold text-sm mb-1">Write a Blog Post</h3>
               <p class="text-xs text-gray-600">Create engaging content about any topic</p>
             </div>
-            <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="code">
+            <div class="template-card p-3 md:p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="code">
               <div class="text-2xl mb-2">💻</div>
               <h3 class="font-semibold text-sm mb-1">Generate Code</h3>
               <p class="text-xs text-gray-600">Build functions, scripts, or applications</p>
             </div>
-            <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="marketing">
+            <div class="template-card p-3 md:p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="marketing">
               <div class="text-2xl mb-2">🎯</div>
               <h3 class="font-semibold text-sm mb-1">Marketing Campaign</h3>
               <p class="text-xs text-gray-600">Design promotional content and strategies</p>
             </div>
-            <div class="template-card p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="email">
+            <div class="template-card p-3 md:p-4 border-2 border-gray-200 rounded-lg bg-white" data-template="email">
               <div class="text-2xl mb-2">✉️</div>
               <h3 class="font-semibold text-sm mb-1">Professional Email</h3>
               <p class="text-xs text-gray-600">Craft clear and effective emails</p>
