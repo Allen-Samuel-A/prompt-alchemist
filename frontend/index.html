@@ -349,6 +349,23 @@
         line-height: 1.5;
       }
     }
+
+    /* New CSS for Toast Animation */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+    }
+    
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-out;
+    }
+    /* End New CSS for Toast Animation */
   </style>
 </head>
 <body class="bg-white h-screen flex flex-col overflow-hidden">
@@ -888,47 +905,82 @@
       mobileOverlay.classList.remove('active');
     });
 
-    visualForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const userIdea = `Role: ${roleInput.value.trim()}\nTask: ${taskInput.value.trim()}\nContext: ${contextInput.value.trim()}\nConstraints: ${constraintsInput.value.trim()}`.trim();
+    // ==========================================================
+    // START: ADDED/UPDATED JS FUNCTIONS
+    // ==========================================================
 
-      if (!taskInput.value.trim()) {
-        alert('Please describe the main task.');
+    // Input validation function
+    function validateInput(text) {
+      const trimmed = text.trim();
+      
+      // Check if input is too short or just random characters
+      if (trimmed.length < 3) {
+        return { valid: false, error: 'Please provide a more detailed description.' };
+      }
+      
+      // Check for gibberish (repeated characters)
+      const repeatedPattern = /^(.)\1{4,}$/; // 5+ same characters
+      if (repeatedPattern.test(trimmed)) {
+        return { valid: false, error: 'Please provide a meaningful description.' };
+      }
+      
+      // Check for only non-alphabetic characters
+      const hasLetters = /[a-zA-Z]{2,}/.test(trimmed);
+      if (!hasLetters) {
+        return { valid: false, error: 'Please use actual words to describe your needs.' };
+      }
+      
+      return { valid: true };
+    }
+
+    // Show temporary error toast
+    function showError(message) {
+      const toast = document.createElement('div');
+      toast.className = 'fixed top-20 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fadeIn';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+    
+    // Clean unwanted content from AI responses
+    function cleanAIResponse(content) {
+      if (typeof content !== 'string') return content;
+      
+      // Remove solution matrices and recommended paths
+      const unwantedSections = [
+        /### Solution Matrix[\s\S]*?(?=###|$)/gi,
+        /### Recommended Path[\s\S]*?(?=###|$)/gi,
+        /\| Solution \|[\s\S]*?(?=###|$)/gi,
+        /```json[\s\S]*?```/gi,
+        /```[\s\S]*?```/gi
+      ];
+      
+      let cleaned = content;
+      unwantedSections.forEach(pattern => {
+        cleaned = cleaned.replace(pattern, '');
+      });
+      
+      // Clean up multiple blank lines
+      cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+      
+      return cleaned.trim();
+    }
+
+    // Enhanced processMessage with validation
+    async function processMessage(userContent) {
+      // Validation should ideally happen before calling this function, 
+      // but we keep a check here for robustness if called from another place.
+      const validation = validateInput(userContent);
+      if (!validation.valid) {
+        showError(validation.error);
         return;
       }
-
-      roleInput.value = '';
-      taskInput.value = '';
-      contextInput.value = '';
-      constraintsInput.value = '';
-
-      sidebar.classList.remove('mobile-open');
-      mobileOverlay.classList.remove('active');
-
-      await processMessage(userIdea);
-    });
-
-    if (guidedForm) {
-      guidedForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const userMessage = guidedInput.value.trim();
-        if (!userMessage) return;
-        guidedInput.value = '';
-        await processMessage(userMessage);
-      });
-    }
-
-    if (guidedFormMobile) {
-      guidedFormMobile.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const userMessage = guidedInputMobile.value.trim();
-        if (!userMessage) return;
-        guidedInputMobile.value = '';
-        await processMessage(userMessage);
-      });
-    }
-
-    async function processMessage(userContent) {
+      
       removePlaceholder();
       displayUserMessage(userContent);
       saveHistory('user', userContent);
@@ -962,18 +1014,108 @@
         const data = await response.json();
         
         typingBubble.remove();
-        displayAssistantMessage(data.expert_prompt, data.explanation);
-        saveHistory('assistant', data.expert_prompt);
+        
+        // Clean the response before displaying
+        const cleanedPrompt = cleanAIResponse(data.expert_prompt);
+        displayAssistantMessage(cleanedPrompt, data.explanation);
+        saveHistory('assistant', cleanedPrompt);
         
       } catch (error) {
         console.error('Error:', error);
         typingBubble.remove();
         let errorMessage = 'Sorry, something went wrong. Please try again.';
+        
+        if (error.message.includes('429')) {
+          errorMessage = '⚠️ Service is busy. Please wait a moment and try again.';
+        } else if (error.message.includes('Network')) {
+          errorMessage = '⚠️ Network error. Please check your connection.';
+        }
+        
         displayAssistantMessage(errorMessage);
       } finally {
         spinner.classList.add('hidden');
       }
     }
+
+    // Enhanced visual form submit with better validation
+    visualForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const role = roleInput.value.trim();
+      const task = taskInput.value.trim();
+      const context = contextInput.value.trim();
+      const constraints = constraintsInput.value.trim();
+
+      // Validate task is provided
+      if (!task) {
+        showError('Please describe the main task.');
+        taskInput.focus();
+        return;
+      }
+      
+      // Validate task isn't gibberish
+      const taskValidation = validateInput(task);
+      if (!taskValidation.valid) {
+        showError(taskValidation.error);
+        taskInput.focus();
+        return;
+      }
+      
+      // Build the user idea
+      const userIdea = `Role: ${role || 'General AI Assistant'}\nTask: ${task}\nContext: ${context || 'General use case'}\nConstraints: ${constraints || 'None specified'}`;
+
+      // Clear inputs
+      roleInput.value = '';
+      taskInput.value = '';
+      contextInput.value = '';
+      constraintsInput.value = '';
+
+      sidebar.classList.remove('mobile-open');
+      mobileOverlay.classList.remove('active');
+
+      await processMessage(userIdea);
+    });
+
+    // Enhanced guided form validation
+    if (guidedForm) {
+      guidedForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userMessage = guidedInput.value.trim();
+        
+        if (!userMessage) return;
+        
+        const validation = validateInput(userMessage);
+        if (!validation.valid) {
+          showError(validation.error);
+          return;
+        }
+        
+        guidedInput.value = '';
+        await processMessage(userMessage);
+      });
+    }
+
+    if (guidedFormMobile) {
+      guidedFormMobile.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userMessage = guidedInputMobile.value.trim();
+        
+        if (!userMessage) return;
+        
+        const validation = validateInput(userMessage);
+        if (!validation.valid) {
+          showError(validation.error);
+          return;
+        }
+        
+        guidedInputMobile.value = '';
+        await processMessage(userMessage);
+      });
+    }
+
+    // ==========================================================
+    // END: ADDED/UPDATED JS FUNCTIONS
+    // ==========================================================
 
     function displayUserMessage(content) {
       const msg = document.createElement('div');
@@ -1105,7 +1247,8 @@
           if (msg.role === 'user') {
             displayUserMessage(msg.content);
           } else if (msg.role === 'assistant') {
-            displayAssistantMessage(msg.content);
+            // Note: Explanation is not saved in history with the content, so we pass undefined
+            displayAssistantMessage(msg.content); 
           }
         });
       }
