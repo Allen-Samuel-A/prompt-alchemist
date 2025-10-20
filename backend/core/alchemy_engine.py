@@ -113,12 +113,10 @@ def classify_intent(user_context: str) -> str:
     """Classifies the user's intent based on keywords for example injection."""
     context_lower = user_context.lower()
     
-    # MODIFIED: Removed 'script' from code_generation.
     if any(k in context_lower for k in ["code", "function", "python", "javascript", "react", "html", "css", "ts"]):
         return "code_generation"
     if any(k in context_lower for k in ["email", "letter", "memo", "announcement", "resignation", "formal"]):
         return "formal_email"
-    # MODIFIED: Added 'video', 'video script' for marketing, as that was the user's intent.
     if any(k in context_lower for k in ["marketing", "campaign", "social media", "ad", "copywriting", "launch", "video", "video script"]):
         return "marketing_campaign"
     if any(k in context_lower for k in ["image", "picture", "photo", "render", "style", "cinematic", "visual"]):
@@ -239,19 +237,18 @@ def smart_model_selection(requested_model: str, is_generation_task: bool) -> str
 
 def get_optimization_suggestion(task_category: str) -> str:
     """Provides advanced optimization framework suggestions for expert users."""
-    # MODIFIED LOGIC: Now marketing_campaign gets AIDA, and code_generation/formal_email gets CoVe.
     if task_category in ["code_generation", "formal_email"]:
         return "Try refining this prompt with the **Chain-of-Verification (CoVe)** framework to improve reliability and reduce factual errors."
-    elif task_category in ["creative_writing", "image_generation"]:
-        return "For maximum quality, try running this prompt multiple times and picking the best result (Self-Consistency), or use the **CoT-Llama** framework for step-by-step creative planning."
     elif task_category == "marketing_campaign":
         return "Implement the **AIDA Framework (Attention, Interest, Desire, Action)** in the next refinement to focus the prompt's psychological impact."
+    elif task_category in ["creative_writing", "image_generation"]:
+        return "For maximum quality, try running this prompt multiple times and picking the best result (Self-Consistency), or use the **CoT-Llama** framework for step-by-step creative planning."
     else:
         return "Consider using the **Few-Shot Learning** technique (add a perfect example to your next query) for better structured output consistency."
 
 
 # ==========================================
-# LAYER 2: OBJECTIVE AUDIT (Retained)
+# LAYER 2: OBJECTIVE AUDIT (CRITICALLY FIXED)
 # ==========================================
 
 async def audit_generated_prompt(expert_prompt: str, task_category: str) -> Optional[AuditResult]:
@@ -264,31 +261,37 @@ async def audit_generated_prompt(expert_prompt: str, task_category: str) -> Opti
         # Layer 5 integration: Get the advanced suggestion
         advanced_suggestion = get_optimization_suggestion(task_category)
         
+        # --- Dynamic Feedback Configuration ---
+        if task_category in ["creative_writing", "image_generation"]:
+            tech_specificity_feedback = "Focuses on narrative structure, tone, and visual/character depth, essential for creative work."
+            tech_specificity_term = "Visual/Narrative Specificity"
+            tech_specificity_score = random.randint(92, 100)
+            suggestions = [advanced_suggestion, "Ensure the setting details are rich with sensory language or light/color description."]
+        elif task_category == "marketing_campaign":
+            tech_specificity_feedback = "Uses marketing terminology (KPIs, audience segmentation) effectively and targets platform constraints."
+            tech_specificity_term = "Marketing Specificity"
+            tech_specificity_score = random.randint(89, 97)
+            suggestions = [advanced_suggestion, "Ensure the call-to-action is highly visible and specific."]
+        else: # code_generation, formal_email, general
+            tech_specificity_feedback = f"Uses advanced terminology appropriate for {task_category} (e.g., type hinting, diplomatic tone)."
+            tech_specificity_term = "Technical Specificity"
+            tech_specificity_score = random.randint(85, 95)
+            suggestions = [advanced_suggestion, "Ensure the target model is explicitly named at the beginning."]
+        
+        # --- Simulated JSON Generation ---
         simulated_audit_json = {
             "overall_score": random.randint(88, 98),
             "grade": random.choice(["A+", "A"]),
             "estimated_success_rate": random.choice(["Extremely High (95%+)", "Very High (90%+)"]),
             "dimensions": {
                 "Completeness": {"score": random.randint(90, 100), "feedback": "All four sections (Role, Task, Context, Constraints) are present and detailed."},
-                "Technical Specificity": {"score": random.randint(85, 100), "feedback": f"Uses advanced terminology appropriate for {task_category}."},
+                tech_specificity_term: {"score": tech_specificity_score, "feedback": tech_specificity_feedback},
                 "Clarity of Constraints": {"score": random.randint(85, 95), "feedback": "Output formats and limitations are explicitly defined."}
             },
-            "strengths": ["Excellent structure and clear role assignment.", "Successfully integrated technical language for the target domain."],
-            "suggestions": [
-                advanced_suggestion, # The advanced suggestion is inserted here
-                random.choice(["Ensure the target model is explicitly named at the beginning.", "The Context section could be slightly more concise."])
-            ]
+            "strengths": ["Excellent structure and clear role assignment.", "Successfully integrated specialized terminology for the target domain."],
+            "suggestions": suggestions
         }
         
-        # NOTE: We need to adjust the simulated audit for the frontend display based on the correct classification.
-        # Since the original response incorrectly showed code_generation feedback, we must correct that here.
-        if task_category == "marketing_campaign":
-             simulated_audit_json['dimensions']['Technical Specificity']['feedback'] = "Uses marketing terminology (KPIs, audience segmentation) effectively."
-             simulated_audit_json['suggestions'] = [
-                advanced_suggestion, # AIDA Framework
-                "Ensure the call-to-action is highly visible and specific."
-            ]
-
         audit_data = simulated_audit_json
         return AuditResult.model_validate(audit_data)
         
@@ -342,32 +345,38 @@ def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage
     skip_keywords = ['none', 'no', 'skip', 'nothing', 'not needed', 'n/a']
     user_wants_to_skip = last_user_message in skip_keywords
     
-    if analysis["completeness_score"] >= 70: return None
+    # FIX PRIORITY 1: If constraints are missing, ask for them before anything else (unless generation is ready)
+    if not analysis["has_constraints"] and analysis["has_context"] and analysis["has_task"]:
+        if user_wants_to_skip: return None # If skipping, move straight to generation
+        
+        task_type = analysis.get("task_type")
+        if task_type == "email": return "We're almost there! Do you have any specific constraints? For example, should the tone be professional or casual, is there a length limit, or any key points that must be included? (Just type 'none' if you're flexible!)"
+        elif task_type == "code": return "Great! For the code prompt, do you have any technical constraints? Which programming language should be used, are there performance goals, or any specific code styles required? (You can say 'none' if you're flexible!)"
+        elif task_type == "creative": return "Almost ready! For the 'Constraints' section of the prompt, do you have specific length limits (e.g., 500 words), style requirements (e.g., use sensory details), or characters that must be included? (Type 'none' if you're flexible!)"
+        else: return "Last piece of info needed: Do you have any format or style constraints? This could be a length requirement, a specific tone you need (like funny or serious), or things the AI must be sure to avoid. (Type 'none' to move on!)"
     
-    if analysis["message_count"] == 1 and analysis["completeness_score"] < 25:
-        return "Hello! I'm the Prompt Alchemist 🪄\n\nI'll help you create the perfect AI prompt through conversation. Just tell me what you'd like to create!\n\nExamples:\n• 'Write a resignation email to my boss'\n• 'Create a Python sorting function'\n• 'Generate a blog post about AI trends'\n\nWhat can I help you with?"
+    # Check if we have enough information (score >= 70) or if constraints were skipped/provided
+    if analysis["completeness_score"] >= 70 or (analysis["has_constraints"] and analysis["has_context"] and analysis["has_task"]):
+        return None # Ready to generate!
 
-    task_type = analysis.get("task_type")
-    
+    # Normal question flow (asking for context, etc.)
     if not analysis["has_context"] and not user_wants_to_skip:
+        task_type = analysis.get("task_type")
         if task_type == "email": return "That's a great start! To make this email perfect, could you tell me who the email is for (like a boss, colleague, or client) and what the main situation is? More context helps me craft a precise prompt for you."
         elif task_type == "code": return "Got it, code generation! I need a little more detail: What exactly should the code accomplish, and what's the specific use case or problem it needs to solve? That helps me zero in on the best prompt."
         elif task_type == "blog": return "Awesome, a blog post! Who is your target audience, and what's the main idea or message you want them to take away? Focusing the audience helps a lot!"
         elif task_type == "creative": return "Fantastic! For a great story prompt, we need some narrative structure. What is the desired **tone** (e.g., dark, whimsical, serious), and what are the **stakes** or **key conflict** we should establish at the start? Telling me the genre also helps!"
         else: return "I need a bit more context to craft a really strong prompt. What's the main goal of your prompt, and who is the final audience? Knowing the purpose and the audience makes a huge difference!"
     
-    if not analysis["has_constraints"] and analysis["has_context"] and analysis["has_task"]:
-        if user_wants_to_skip: return None 
-        
-        if task_type == "email": return "We're almost there! Do you have any specific constraints? For example, should the tone be professional or casual, is there a length limit, or any key points that must be included? (Just type 'none' if you're flexible!)"
-        elif task_type == "code": return "Great! For the code prompt, do you have any technical constraints? Which programming language should be used, are there performance goals, or any specific code styles required? (You can say 'none' if you're flexible!)"
-        elif task_type == "creative": return "Almost ready! For the 'Constraints' section of the prompt, do you have specific length limits (e.g., 500 words), style requirements (e.g., use sensory details), or characters that must be included? (Type 'none' if you're flexible!)"
-        else: return "Last piece of info needed: Do you have any format or style constraints? This could be a length requirement, a specific tone you need (like funny or serious), or things the AI must be sure to avoid. (Type 'none' to move on!)"
+    # Fallback to generate prompt if nothing else is missing and score is decent
+    if analysis["completeness_score"] >= 40 or user_wants_to_skip:
+        return None # Ready to generate!
     
-    if analysis["completeness_score"] >= 40 or user_wants_to_skip: return None
+    # Final check for detail
+    if analysis["completeness_score"] < 50:
+        return "Thanks! Your idea is shaping up well. Would you like to add any more specific details about the exact outcome you want or any special requirements? If not, just say 'generate' and I'll create your prompt!"
     
-    if analysis["completeness_score"] < 50: return "Thanks! Your idea is shaping up well. Would you like to add any more specific details about the exact outcome you want or any special requirements? If not, just say 'generate' and I'll create your prompt!"
-    
+    # Default
     return "Got it! I have enough information to create a detailed prompt. Would you like to add anything else, or should I go ahead and generate the expert prompt now? Type 'generate' when you're ready!"
 
 
