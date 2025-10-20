@@ -1,3 +1,4 @@
+# backend/core/alchemy_engine.py
 
 from typing import List, Dict, Optional, Tuple, Any 
 from models.chat_models import ChatMessage, AuditResult
@@ -168,7 +169,7 @@ async def instant_vague_correction(user_idea: str) -> str:
 
 
 # ==========================================
-# LAYER 3: ADAPTIVE MEMORY COMPRESSION (New)
+# LAYER 3: ADAPTIVE MEMORY COMPRESSION (Retained)
 # ==========================================
 
 async def summarize_conversation(messages: List[ChatMessage]) -> Tuple[List[ChatMessage], str]:
@@ -209,7 +210,7 @@ async def summarize_conversation(messages: List[ChatMessage]) -> Tuple[List[Chat
 
 
 # ==========================================
-# LAYER 4: SMART MODEL SELECTION (New)
+# LAYER 4: SMART MODEL SELECTION (Retained)
 # ==========================================
 
 def smart_model_selection(requested_model: str, is_generation_task: bool) -> str:
@@ -231,7 +232,7 @@ def smart_model_selection(requested_model: str, is_generation_task: bool) -> str
 
 
 # ==========================================
-# LAYER 5: OPTIMIZATION FRAMEWORK SUGGESTION (New)
+# LAYER 5: OPTIMIZATION FRAMEWORK SUGGESTION (Retained)
 # ==========================================
 
 def get_optimization_suggestion(task_category: str) -> str:
@@ -247,7 +248,7 @@ def get_optimization_suggestion(task_category: str) -> str:
 
 
 # ==========================================
-# LAYER 2: OBJECTIVE AUDIT (New)
+# LAYER 2: OBJECTIVE AUDIT (Retained)
 # ==========================================
 
 async def audit_generated_prompt(expert_prompt: str, task_category: str) -> Optional[AuditResult]:
@@ -511,7 +512,7 @@ async def process_chat_request(
             "explanation": "Unable to process empty conversation."
         }
     
-    user_messages = [msg.content for msg in messages if msg.role == "user" and isinstance(msg.content, str)]
+    user_messages = [msg.content for msg in messages if msg.role == "user" and isinstance(messages[-1].content, str)]
     user_context = "\n".join(user_messages)
     
     # --- LAYER 4: SAFETY GUARDRAIL (Max Token/Size Check) ---
@@ -546,6 +547,13 @@ async def process_chat_request(
     
     next_question = generate_smart_question(analysis, messages)
     user_wants_to_generate = any(keyword in messages[-1].content.lower() for keyword in ['generate', 'ready', 'create it', 'make it'])
+    
+    # FIX: Prioritize asking the question IF a question exists AND the user did not explicitly say "generate."
+    # The generation task is now ONLY true if:
+    # 1. We are in Visual Mode OR
+    # 2. No question is left to ask (completeness >= 70) OR
+    # 3. The user explicitly commanded generation.
+    
     is_generation_task = mode == "visual" or (next_question is None) or user_wants_to_generate
 
     # --- LAYER 3: ADAPTIVE MEMORY COMPRESSION ---
@@ -585,17 +593,16 @@ async def process_chat_request(
     # ==========================================
     # FOLLOW-UP QUESTION LOGIC
     # ==========================================
-    # If not generating, ensure model is downgraded for the question step (Layer 4)
+    # This block executes if is_generation_task is False (i.e., we must ask a question)
     if next_question:
-        # Note: The actual API call for the question is implicit, but we ensured the model selection
-        # would be cheaper if the user selected a premium model for this step.
+        # We return the question, ensuring the model used for this step was the cheaper one (Layer 4)
         return {
             "expert_prompt": next_question,
             "explanation": f"Gathering more details to create the perfect prompt (completeness: {analysis['completeness_score']}%).",
-            "model_used": final_model_to_use # Optional: for debugging, shows cheaper model used
+            # We don't need 'model_used' in the final response but it confirms the logic
         }
     
-    # Fallback/Error case
+    # Fallback/Error case (should rarely be hit if logic is correct)
     return {
         "expert_prompt": "I think I have what I need! Would you like me to generate your prompt now, or would you like to add more details?",
         "explanation": "Ready to generate when you are."
