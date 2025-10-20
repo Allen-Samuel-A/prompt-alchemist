@@ -248,7 +248,7 @@ def get_optimization_suggestion(task_category: str) -> str:
 
 
 # ==========================================
-# LAYER 2: OBJECTIVE AUDIT (CRITICALLY FIXED)
+# LAYER 2: OBJECTIVE AUDIT (FIXED)
 # ==========================================
 
 async def audit_generated_prompt(expert_prompt: str, task_category: str) -> Optional[AuditResult]:
@@ -261,22 +261,36 @@ async def audit_generated_prompt(expert_prompt: str, task_category: str) -> Opti
         # Layer 5 integration: Get the advanced suggestion
         advanced_suggestion = get_optimization_suggestion(task_category)
         
-        # --- Dynamic Feedback Configuration ---
+        # --- Dynamic Feedback Configuration (FIXED LOGIC) ---
         if task_category in ["creative_writing", "image_generation"]:
             tech_specificity_feedback = "Focuses on narrative structure, tone, and visual/character depth, essential for creative work."
             tech_specificity_term = "Visual/Narrative Specificity"
             tech_specificity_score = random.randint(92, 100)
             suggestions = [advanced_suggestion, "Ensure the setting details are rich with sensory language or light/color description."]
+        
         elif task_category == "marketing_campaign":
             tech_specificity_feedback = "Uses marketing terminology (KPIs, audience segmentation) effectively and targets platform constraints."
             tech_specificity_term = "Marketing Specificity"
             tech_specificity_score = random.randint(89, 97)
             suggestions = [advanced_suggestion, "Ensure the call-to-action is highly visible and specific."]
-        else: # code_generation, formal_email, general
-            tech_specificity_feedback = f"Uses advanced terminology appropriate for {task_category} (e.g., type hinting, diplomatic tone)."
+        
+        elif task_category == "code_generation":
+            tech_specificity_feedback = "Uses advanced programming terminology and language-specific best practices effectively."
             tech_specificity_term = "Technical Specificity"
             tech_specificity_score = random.randint(85, 95)
-            suggestions = [advanced_suggestion, "Ensure the target model is explicitly named at the beginning."]
+            suggestions = [advanced_suggestion, "Ensure the target programming language and framework are explicitly named."]
+        
+        elif task_category == "formal_email":
+            tech_specificity_feedback = "Uses professional communication terminology and maintains appropriate diplomatic tone throughout."
+            tech_specificity_term = "Professional Tone Specificity"
+            tech_specificity_score = random.randint(88, 96)
+            suggestions = [advanced_suggestion, "Ensure the recipient relationship and organizational context are clear."]
+        
+        else:  # general fallback
+            tech_specificity_feedback = "Uses clear, domain-appropriate language and maintains focus on the core objective."
+            tech_specificity_term = "Domain Specificity"
+            tech_specificity_score = random.randint(85, 93)
+            suggestions = [advanced_suggestion, "Ensure the target model and expected output format are explicitly defined."]
         
         # --- Simulated JSON Generation ---
         simulated_audit_json = {
@@ -284,11 +298,23 @@ async def audit_generated_prompt(expert_prompt: str, task_category: str) -> Opti
             "grade": random.choice(["A+", "A"]),
             "estimated_success_rate": random.choice(["Extremely High (95%+)", "Very High (90%+)"]),
             "dimensions": {
-                "Completeness": {"score": random.randint(90, 100), "feedback": "All four sections (Role, Task, Context, Constraints) are present and detailed."},
-                tech_specificity_term: {"score": tech_specificity_score, "feedback": tech_specificity_feedback},
-                "Clarity of Constraints": {"score": random.randint(85, 95), "feedback": "Output formats and limitations are explicitly defined."}
+                "Completeness": {
+                    "score": random.randint(90, 100),  
+                    "feedback": "All four sections (Role, Task, Context, Constraints) are present and detailed."
+                },
+                tech_specificity_term: {
+                    "score": tech_specificity_score,  
+                    "feedback": tech_specificity_feedback
+                },
+                "Clarity of Constraints": {
+                    "score": random.randint(85, 95),  
+                    "feedback": "Output formats and limitations are explicitly defined."
+                }
             },
-            "strengths": ["Excellent structure and clear role assignment.", "Successfully integrated specialized terminology for the target domain."],
+            "strengths": [
+                "Excellent structure and clear role assignment.",  
+                f"Successfully integrated specialized terminology for the {task_category.replace('_', ' ')} domain."
+            ],
             "suggestions": suggestions
         }
         
@@ -305,7 +331,7 @@ async def audit_generated_prompt(expert_prompt: str, task_category: str) -> Opti
 # ==========================================
 # Note: These functions must match the last working version provided in the conversation history.
 
-def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
+def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, Any]: # FIXED: changed 'any' to 'Any'
     """Analyzes the conversation to understand what information has been gathered."""
     user_messages = [msg.content for msg in messages if msg.role == "user" and isinstance(msg.content, str)]
     full_conversation = " ".join(user_messages).lower()
@@ -339,24 +365,32 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
     return analysis
 
 
-def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage]) -> Optional[str]:
+def generate_smart_question(analysis: Dict[str, Any], messages: List[ChatMessage]) -> Optional[str]: # FIXED: changed 'any' to 'Any'
     """Generates an intelligent follow-up question based on what's missing."""
     last_user_message = messages[-1].content.lower().strip() if messages and isinstance(messages[-1].content, str) else ""
     skip_keywords = ['none', 'no', 'skip', 'nothing', 'not needed', 'n/a']
     user_wants_to_skip = last_user_message in skip_keywords
     
-    # FIX PRIORITY 1: If constraints are missing, ask for them before anything else (unless generation is ready)
-    if not analysis["has_constraints"] and analysis["has_context"] and analysis["has_task"]:
-        if user_wants_to_skip: return None # If skipping, move straight to generation
-        
+    # Check if the previous assistant message was asking about constraints
+    was_asking_for_constraints = False
+    if len(messages) >= 2 and messages[-2].role == "assistant":
+        prev_message = messages[-2].content.lower()
+        if "constraint" in prev_message or "length limit" in prev_message or "tone be" in prev_message:
+            was_asking_for_constraints = True
+
+    # FIX: If user just skipped constraints question, treat as "has_constraints" for flow purposes
+    effective_has_constraints = analysis["has_constraints"] or (was_asking_for_constraints and user_wants_to_skip)
+
+    # PRIORITY 1: If constraints are missing AND not just skipped, ask for them
+    if not effective_has_constraints and analysis["has_context"] and analysis["has_task"]:
         task_type = analysis.get("task_type")
         if task_type == "email": return "We're almost there! Do you have any specific constraints? For example, should the tone be professional or casual, is there a length limit, or any key points that must be included? (Just type 'none' if you're flexible!)"
         elif task_type == "code": return "Great! For the code prompt, do you have any technical constraints? Which programming language should be used, are there performance goals, or any specific code styles required? (You can say 'none' if you're flexible!)"
         elif task_type == "creative": return "Almost ready! For the 'Constraints' section of the prompt, do you have specific length limits (e.g., 500 words), style requirements (e.g., use sensory details), or characters that must be included? (Type 'none' if you're flexible!)"
         else: return "Last piece of info needed: Do you have any format or style constraints? This could be a length requirement, a specific tone you need (like funny or serious), or things the AI must be sure to avoid. (Type 'none' to move on!)"
     
-    # Check if we have enough information (score >= 70) or if constraints were skipped/provided
-    if analysis["completeness_score"] >= 70 or (analysis["has_constraints"] and analysis["has_context"] and analysis["has_task"]):
+    # Check if we have enough information (use effective constraints)
+    if analysis["completeness_score"] >= 70 or (effective_has_constraints and analysis["has_context"] and analysis["has_task"]):
         return None # Ready to generate!
 
     # Normal question flow (asking for context, etc.)
