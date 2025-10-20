@@ -4,6 +4,7 @@ from typing import List, Dict, Optional, Tuple
 from models.chat_models import ChatMessage
 from services.openrouter_client import get_ai_response
 import logging
+import re
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -82,6 +83,136 @@ def get_research_data(query: str) -> str:
 
 
 # ==========================================
+# CONVERSATION INTELLIGENCE
+# ==========================================
+def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
+    """
+    Analyzes the conversation to understand what information has been gathered.
+    
+    Args:
+        messages: List of conversation messages
+        
+    Returns:
+        Dictionary with analysis results
+    """
+    user_messages = [msg.content for msg in messages if msg.role == "user"]
+    
+    # Combine all user messages to analyze
+    full_conversation = " ".join(user_messages).lower()
+    
+    analysis = {
+        "has_task": False,
+        "has_role": False,
+        "has_context": False,
+        "has_constraints": False,
+        "task_type": None,
+        "completeness_score": 0,
+        "message_count": len(user_messages)
+    }
+    
+    # Detect task
+    task_indicators = [
+        "write", "create", "generate", "make", "build", "design", "develop",
+        "draft", "compose", "code", "script", "email", "letter", "blog",
+        "post", "article", "function", "program", "campaign"
+    ]
+    if any(indicator in full_conversation for indicator in task_indicators):
+        analysis["has_task"] = True
+        analysis["completeness_score"] += 25
+        
+        # Identify task type
+        if any(word in full_conversation for word in ["email", "letter", "message"]):
+            analysis["task_type"] = "email"
+        elif any(word in full_conversation for word in ["code", "function", "script", "program"]):
+            analysis["task_type"] = "code"
+        elif any(word in full_conversation for word in ["blog", "post", "article"]):
+            analysis["task_type"] = "blog"
+        elif any(word in full_conversation for word in ["campaign", "marketing", "ad"]):
+            analysis["task_type"] = "marketing"
+    
+    # Detect role/expertise mentions
+    role_indicators = [
+        "expert", "developer", "engineer", "writer", "designer", "analyst",
+        "specialist", "professional", "senior", "junior", "manager"
+    ]
+    if any(indicator in full_conversation for indicator in role_indicators):
+        analysis["has_role"] = True
+        analysis["completeness_score"] += 20
+    
+    # Detect context
+    context_indicators = [
+        "for", "audience", "purpose", "background", "about", "regarding",
+        "boss", "client", "customer", "user", "team", "company", "project"
+    ]
+    if any(indicator in full_conversation for indicator in context_indicators):
+        analysis["has_context"] = True
+        analysis["completeness_score"] += 25
+    
+    # Detect constraints
+    constraint_indicators = [
+        "should", "must", "need to", "require", "limit", "words", "tone",
+        "style", "format", "professional", "casual", "formal", "length"
+    ]
+    if any(indicator in full_conversation for indicator in constraint_indicators):
+        analysis["has_constraints"] = True
+        analysis["completeness_score"] += 20
+    
+    # Bonus points for detailed messages
+    if len(full_conversation) > 50:
+        analysis["completeness_score"] += 10
+    
+    return analysis
+
+
+def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage]) -> Optional[str]:
+    """
+    Generates an intelligent follow-up question based on what's missing.
+    
+    Args:
+        analysis: Analysis results from analyze_conversation
+        messages: Conversation history
+        
+    Returns:
+        Smart question to ask, or None if ready to generate
+    """
+    # If we have enough information (score >= 70), generate the prompt
+    if analysis["completeness_score"] >= 70:
+        return None
+    
+    # If this is the first message and it's too vague, ask for more details
+    if analysis["message_count"] == 1 and analysis["completeness_score"] < 25:
+        return "I'd love to help you create a great prompt! Could you tell me more about what you'd like to accomplish? For example: 'Write a professional email to resign from my job' or 'Create a Python function to sort data'."
+    
+    # Ask specific questions based on what's missing
+    task_type = analysis.get("task_type")
+    
+    if not analysis["has_context"]:
+        if task_type == "email":
+            return "Great! To make this perfect, could you tell me:\n\n• Who is the email for? (boss, colleague, client)\n• What's the main purpose or situation?\n\nThe more context you provide, the better the prompt!"
+        elif task_type == "code":
+            return "Sounds good! To create the best prompt, I need a bit more info:\n\n• What should the code accomplish?\n• Any specific requirements or use case?\n\nThis helps me craft a precise prompt for you."
+        elif task_type == "blog":
+            return "Excellent! Let me ask:\n\n• Who is your target audience?\n• What's the main topic or message?\n\nThis will help me create a focused prompt."
+        else:
+            return "To create the perfect prompt, could you provide more context?\n\n• What's the purpose or goal?\n• Who is the audience?\n• Any specific situation or background?\n\nMore details = better results!"
+    
+    if not analysis["has_constraints"]:
+        if task_type == "email":
+            return "Perfect! One more thing - any specific requirements?\n\n• Tone: Professional, casual, or formal?\n• Length preference?\n• Any key points to include or avoid?\n\n(Or type 'none' if no specific constraints)"
+        elif task_type == "code":
+            return "Almost there! Any technical constraints?\n\n• Programming language preferences?\n• Performance requirements?\n• Code style or standards?\n\n(Type 'none' if you're flexible)"
+        else:
+            return "Last question - any constraints or requirements?\n\n• Length or format preferences?\n• Tone or style guidelines?\n• Specific things to include or avoid?\n\n(Type 'none' if no constraints)"
+    
+    # If we have task and context but not much detail, ask for refinement
+    if analysis["completeness_score"] < 50:
+        return "Thanks! To make this even better, could you add any specific details about:\n\n• The exact outcome you want\n• Any special requirements\n• The level of detail needed\n\nOr if you're happy with what you've provided, just say 'generate' and I'll create your prompt!"
+    
+    # Default: we have some info, ask if they want to add more or generate
+    return "Got it! I have enough to work with. Would you like to:\n\n• Add more details? Just tell me what else you'd like\n• Generate the prompt now? Type 'generate' or 'ready'\n\nWhat works for you?"
+
+
+# ==========================================
 # PROMPT ENGINEERING
 # ==========================================
 def create_system_prompt(user_idea: str, target_model: str) -> str:
@@ -101,15 +232,15 @@ def create_system_prompt(user_idea: str, target_model: str) -> str:
 production-ready prompts optimized for {target_model}.
 
 ### YOUR MISSION
-The user has provided a BASIC prompt structure. Your job is to TRANSFORM and ENHANCE it into a 
-professional, detailed, research-backed prompt that is SIGNIFICANTLY BETTER than what they provided.
+The user has provided their requirements through a conversation. Your job is to TRANSFORM this into a 
+professional, detailed, research-backed prompt that delivers excellent results.
 
-DO NOT simply reformat their input. You must ADD VALUE by:
+You must ADD VALUE by:
 - Making instructions more specific and actionable
 - Adding relevant context and background
 - Including best practices from research
 - Providing clear success criteria
-- Expanding constraints with helpful details
+- Expanding with helpful details and examples
 
 ### CRITICAL OUTPUT REQUIREMENTS
 You MUST output EXACTLY TWO sections with NOTHING ELSE:
@@ -135,81 +266,31 @@ Every enhanced prompt MUST include these four components with SUBSTANTIAL DETAIL
 ### RESEARCH-BACKED GUIDELINES FOR {target_model.upper()}
 {research}
 
-### USER'S BASIC INPUT (TRANSFORM THIS INTO AN EXPERT-LEVEL PROMPT)
+### USER'S REQUIREMENTS FROM CONVERSATION
 {user_idea}
 
 ### STRICT FORMATTING RULES
 1. Start IMMEDIATELY with "### Prompt" (no preamble)
 2. ENHANCE each of the 4 components with specific, actionable details
-3. Make it AT LEAST 2-3x more detailed than the user's input
+3. Make it comprehensive and production-ready
 4. Add "---EXPLANATION---" after the prompt
-5. Write 2-4 sentences explaining what research-backed improvements you made
+5. Write 2-4 sentences explaining what enhancements you made
 6. STOP after explanation - add nothing else
 
-EXAMPLE OF ENHANCEMENT:
-User Input: "Role: Writer, Task: Write blog post"
-Your Output: "**Role:** Expert Technology Blogger with 10+ years experience in translating complex technical concepts into engaging narratives for non-technical audiences, specializing in trend analysis and thought leadership"
+EXAMPLE OF GOOD OUTPUT:
+### Prompt
+**Role:** You are a professional HR communication specialist with expertise in crafting diplomatic resignation letters that maintain positive relationships and professional reputation.
 
-Now enhance the user's prompt following this approach."""
+**Task:** Compose a formal resignation letter that clearly communicates the decision to leave, expresses gratitude for opportunities received, offers appropriate transition support, and maintains a respectful, professional tone throughout.
 
+**Context:** This letter will be sent to the employee's direct supervisor and HR department. It needs to be formal yet warm, brief but complete, and should leave the door open for future professional connections. The employee wants to leave on good terms and maintain their professional reputation.
 
-# ==========================================
-# CONVERSATION FLOW MANAGEMENT
-# ==========================================
-class GuidedFlowManager:
-    """Manages the step-by-step guided conversation flow"""
-    
-    FLOW_STEPS = [
-        {
-            "trigger": None,  # Initial state
-            "prompt": "Hello! I'm the Prompt Alchemist 🪄 Let's craft an expert-level prompt together.\n\nWhat would you like to create? (e.g., 'Write a blog post', 'Generate Python code', 'Create a marketing email')",
-            "explanation": "Starting guided prompt creation process."
-        },
-        {
-            "trigger": "goal or idea",
-            "prompt": "Great! What expertise or role should the AI have?\n\nExamples:\n• Senior Software Engineer\n• Digital Marketing Specialist\n• Technical Writer\n• Data Analyst",
-            "explanation": "Role definition ensures the AI adopts the right perspective."
-        },
-        {
-            "trigger": "role should the AI",
-            "prompt": "Perfect! Now describe the specific task in detail.\n\nBe specific about what you want the AI to do. The clearer you are, the better the result!",
-            "explanation": "Clear task definition is crucial for focused output."
-        },
-        {
-            "trigger": "main task",
-            "prompt": "Excellent! Please provide context:\n\n• Who is the audience?\n• What's the purpose?\n• Any background information?\n\n(This helps the AI understand the bigger picture)",
-            "explanation": "Context helps the AI understand the bigger picture."
-        },
-        {
-            "trigger": "context",
-            "prompt": "Almost done! Any constraints or requirements?\n\nExamples:\n• Word count limits\n• Specific tone or style\n• Technical requirements\n• Format preferences\n\n(Type 'none' if no constraints)",
-            "explanation": "Constraints shape the boundaries of the AI's creativity."
-        }
-    ]
-    
-    @staticmethod
-    def get_last_assistant_message(messages: List[ChatMessage]) -> Optional[str]:
-        """Extract the last assistant message from conversation history"""
-        for msg in reversed(messages[:-1]):
-            if msg.role == "assistant":
-                if isinstance(msg.content, dict):
-                    return msg.content.get("expert_prompt", "")
-                return msg.content
-        return None
-    
-    @staticmethod
-    def get_current_step(last_message: Optional[str]) -> Optional[Dict[str, str]]:
-        """Determine current conversation step based on last message"""
-        if last_message is None or "start over" in last_message.lower():
-            return GuidedFlowManager.FLOW_STEPS[0]
-        
-        for step in GuidedFlowManager.FLOW_STEPS[1:]:
-            if step["trigger"] and step["trigger"] in last_message.lower():
-                idx = GuidedFlowManager.FLOW_STEPS.index(step)
-                if idx + 1 < len(GuidedFlowManager.FLOW_STEPS):
-                    return GuidedFlowManager.FLOW_STEPS[idx + 1]
-        
-        return None
+**Constraints:** Keep the letter to 150-200 words, use professional business letter formatting, maintain a positive and grateful tone throughout, avoid any negative comments or reasons for leaving, include a clear last working day (2 weeks from date), offer to help with transition, and end with appreciation for the experience gained.
+
+---EXPLANATION---
+This prompt transforms the basic request into a comprehensive guide by specifying professional expertise, defining all deliverables with clear tone requirements, providing crucial context about recipients and goals, and establishing specific constraints to ensure a polished, professional result.
+
+Now create the enhanced prompt following this exact format."""
 
 
 # ==========================================
@@ -281,7 +362,7 @@ def format_response(raw_response: str) -> Tuple[str, str]:
         prompt_part = parts[0].strip()
         explanation_part = parts[1].strip()
         
-        # Remove unwanted sections from prompt (Solution Matrix, Recommended Path, etc.)
+        # Remove unwanted sections from prompt
         unwanted_markers = [
             "### Solution Matrix",
             "### Recommended Path", 
@@ -333,31 +414,40 @@ async def process_chat_request(
         }
     
     # ==========================================
-    # GUIDED MODE: Step-by-step interaction
+    # GUIDED MODE: Intelligent conversation flow
     # ==========================================
     if mode == "guided":
-        last_msg = GuidedFlowManager.get_last_assistant_message(messages)
-        current_step = GuidedFlowManager.get_current_step(last_msg)
+        # Check if this is the first message
+        user_messages = [msg for msg in messages if msg.role == "user"]
         
-        # Return next question in the flow
-        if current_step:
-            return {
-                "expert_prompt": current_step["prompt"],
-                "explanation": current_step["explanation"]
-            }
-        
-        # All questions answered - generate final prompt
-        user_answers = [msg.content for msg in messages if msg.role == "user"]
-        
-        if len(user_answers) >= 5:
-            # Extract the 5 answers: goal, role, task, context, constraints
-            assembled_idea = f"""Goal: {user_answers[-5]}
-Role: {user_answers[-4]}
-Task: {user_answers[-3]}
-Context: {user_answers[-2]}
-Constraints: {user_answers[-1]}"""
+        if len(user_messages) == 1:
+            first_message = user_messages[0].content.lower().strip()
             
-            system_prompt = create_system_prompt(assembled_idea, model)
+            # Handle greetings
+            if first_message in ['hi', 'hello', 'hey', 'help', 'start']:
+                return {
+                    "expert_prompt": "Hello! I'm the Prompt Alchemist 🪄\n\nI'll help you create the perfect AI prompt through conversation. Just tell me what you'd like to create!\n\nExamples:\n• 'Write a resignation email to my boss'\n• 'Create a Python sorting function'\n• 'Generate a blog post about AI trends'\n\nWhat can I help you with?",
+                    "explanation": "Starting guided conversation to understand your needs."
+                }
+        
+        # Analyze the conversation to understand what we have
+        analysis = analyze_conversation(messages)
+        
+        logger.info(f"Conversation analysis: {analysis}")
+        
+        # Check if user is saying they're ready to generate
+        last_message = messages[-1].content.lower()
+        ready_keywords = ['generate', 'ready', 'create it', 'make it', 'go ahead', "that's all", 'done', 'perfect']
+        user_wants_to_generate = any(keyword in last_message for keyword in ready_keywords)
+        
+        # Generate prompt if we have enough info OR user explicitly requests it
+        if analysis["completeness_score"] >= 70 or (user_wants_to_generate and analysis["completeness_score"] >= 40):
+            logger.info("Generating prompt - sufficient information collected")
+            
+            # Compile all user messages into context
+            user_context = "\n".join([msg.content for msg in messages if msg.role == "user"])
+            
+            system_prompt = create_system_prompt(user_context, model)
             api_messages = [ChatMessage(role="user", content=system_prompt)]
             
             # Call API with fallback
@@ -366,23 +456,32 @@ Constraints: {user_answers[-1]}"""
             if error == "rate_limit":
                 return {
                     "expert_prompt": "⚠️ High traffic detected. The service is temporarily at capacity. Please wait 30-60 seconds and try again.",
-                    "explanation": "Rate limit encountered. Consider upgrading to a paid API tier for guaranteed availability."
+                    "explanation": "Rate limit encountered. Try again in a moment."
                 }
             
             if error:
                 return {
                     "expert_prompt": f"⚠️ Unable to generate prompt: {error}",
-                    "explanation": "An unexpected error occurred. Please try again or contact support."
+                    "explanation": "An unexpected error occurred. Please try again."
                 }
             
-            # Format and return
+            # Format and return the final prompt
             prompt, explanation = format_response(raw_response)
             return {"expert_prompt": prompt, "explanation": explanation}
         
-        # Conversation flow broken - restart
+        # Not enough info yet - ask a smart follow-up question
+        next_question = generate_smart_question(analysis, messages)
+        
+        if next_question:
+            return {
+                "expert_prompt": next_question,
+                "explanation": f"Gathering more details to create the perfect prompt (completeness: {analysis['completeness_score']}%)."
+            }
+        
+        # Fallback - shouldn't reach here, but just in case
         return {
-            "expert_prompt": "I need a bit more information. Let's start over. What's your main goal?",
-            "explanation": "Restarting guided flow to ensure quality."
+            "expert_prompt": "I think I have what I need! Would you like me to generate your prompt now, or would you like to add more details?",
+            "explanation": "Ready to generate when you are."
         }
     
     # ==========================================
