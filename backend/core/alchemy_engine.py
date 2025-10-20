@@ -100,14 +100,21 @@ def create_system_prompt(user_idea: str, target_model: str) -> str:
     return f"""You are 'Prompt Alchemist', an expert AI prompt engineer specializing in creating 
 production-ready prompts optimized for {target_model}.
 
-### YOUR TASK
-Transform the user's idea into a professionally structured, research-backed prompt that follows 
-best practices for {target_model}.
+### YOUR MISSION
+The user has provided a BASIC prompt structure. Your job is to TRANSFORM and ENHANCE it into a 
+professional, detailed, research-backed prompt that is SIGNIFICANTLY BETTER than what they provided.
+
+DO NOT simply reformat their input. You must ADD VALUE by:
+- Making instructions more specific and actionable
+- Adding relevant context and background
+- Including best practices from research
+- Providing clear success criteria
+- Expanding constraints with helpful details
 
 ### CRITICAL OUTPUT REQUIREMENTS
 You MUST output EXACTLY TWO sections with NOTHING ELSE:
 
-Section 1: The Prompt (starts with "### Prompt")
+Section 1: The Enhanced Prompt (starts with "### Prompt")
 Section 2: The Explanation (starts with "---EXPLANATION---")
 
 DO NOT include:
@@ -118,38 +125,32 @@ DO NOT include:
 - Any text before "### Prompt" or after the explanation
 
 ### PROMPT STRUCTURE
-Every prompt you create MUST include these four components:
+Every enhanced prompt MUST include these four components with SUBSTANTIAL DETAIL:
 
-**Role:** [Define the AI's expertise, persona, or domain knowledge]
-**Task:** [State the specific objective or goal clearly and actionably]
-**Context:** [Provide background, audience, constraints, or environmental details]
-**Constraints:** [List rules, format requirements, limitations, or quality standards]
+**Role:** [Expand on the AI's expertise - add specific skills, knowledge domains, and perspective]
+**Task:** [Make the objective crystal clear with specific deliverables and success criteria]
+**Context:** [Add relevant background, audience details, use case scenarios, and environmental factors]
+**Constraints:** [Expand with quality standards, format requirements, style guidelines, and boundaries]
 
-### RESEARCH-BACKED GUIDELINES
-Apply these model-specific best practices for {target_model}:
+### RESEARCH-BACKED GUIDELINES FOR {target_model.upper()}
 {research}
 
-### USER INPUT
+### USER'S BASIC INPUT (TRANSFORM THIS INTO AN EXPERT-LEVEL PROMPT)
 {user_idea}
 
 ### STRICT FORMATTING RULES
 1. Start IMMEDIATELY with "### Prompt" (no preamble)
-2. Include all 4 components: Role, Task, Context, Constraints
-3. Add "---EXPLANATION---" after the prompt
-4. Write 2-4 sentences explaining how you applied research
-5. STOP after explanation - add nothing else
+2. ENHANCE each of the 4 components with specific, actionable details
+3. Make it AT LEAST 2-3x more detailed than the user's input
+4. Add "---EXPLANATION---" after the prompt
+5. Write 2-4 sentences explaining what research-backed improvements you made
+6. STOP after explanation - add nothing else
 
-EXAMPLE OUTPUT FORMAT:
-### Prompt
-**Role:** [role here]
-**Task:** [task here]
-**Context:** [context here]
-**Constraints:** [constraints here]
+EXAMPLE OF ENHANCEMENT:
+User Input: "Role: Writer, Task: Write blog post"
+Your Output: "**Role:** Expert Technology Blogger with 10+ years experience in translating complex technical concepts into engaging narratives for non-technical audiences, specializing in trend analysis and thought leadership"
 
----EXPLANATION---
-[2-4 sentences referencing research application]
-
-Output the final prompt now following this EXACT format."""
+Now enhance the user's prompt following this approach."""
 
 
 # ==========================================
@@ -161,27 +162,27 @@ class GuidedFlowManager:
     FLOW_STEPS = [
         {
             "trigger": None,  # Initial state
-            "prompt": "Hello! I'm the Prompt Alchemist. Let's craft an expert-level prompt together. What's your main goal or idea?",
+            "prompt": "Hello! I'm the Prompt Alchemist 🪄 Let's craft an expert-level prompt together.\n\nWhat would you like to create? (e.g., 'Write a blog post', 'Generate Python code', 'Create a marketing email')",
             "explanation": "Starting guided prompt creation process."
         },
         {
             "trigger": "goal or idea",
-            "prompt": "Got it! What role or expertise should the AI embody? (e.g., 'senior data analyst', 'creative copywriter', 'technical architect')",
+            "prompt": "Great! What expertise or role should the AI have?\n\nExamples:\n• Senior Software Engineer\n• Digital Marketing Specialist\n• Technical Writer\n• Data Analyst",
             "explanation": "Role definition ensures the AI adopts the right perspective."
         },
         {
             "trigger": "role should the AI",
-            "prompt": "Perfect. Now, what's the specific task or objective? Be as precise as possible.",
+            "prompt": "Perfect! Now describe the specific task in detail.\n\nBe specific about what you want the AI to do. The clearer you are, the better the result!",
             "explanation": "Clear task definition is crucial for focused output."
         },
         {
             "trigger": "main task",
-            "prompt": "Excellent. Please share any relevant context: audience, environment, background information, or use case details.",
+            "prompt": "Excellent! Please provide context:\n\n• Who is the audience?\n• What's the purpose?\n• Any background information?\n\n(This helps the AI understand the bigger picture)",
             "explanation": "Context helps the AI understand the bigger picture."
         },
         {
             "trigger": "context",
-            "prompt": "Almost there! Are there any constraints, formatting requirements, or quality standards I should include?",
+            "prompt": "Almost done! Any constraints or requirements?\n\nExamples:\n• Word count limits\n• Specific tone or style\n• Technical requirements\n• Format preferences\n\n(Type 'none' if no constraints)",
             "explanation": "Constraints shape the boundaries of the AI's creativity."
         }
     ]
@@ -257,6 +258,7 @@ async def call_ai_with_fallback(
 def format_response(raw_response: str) -> Tuple[str, str]:
     """
     Ensures consistent response formatting with prompt and explanation.
+    Cleans up unwanted content like solution matrices and recommended paths.
     
     Args:
         raw_response: Raw AI response text
@@ -264,14 +266,41 @@ def format_response(raw_response: str) -> Tuple[str, str]:
     Returns:
         Tuple of (expert_prompt, explanation)
     """
-    # Ensure proper structure
-    if not raw_response.strip().startswith("### Prompt"):
-        raw_response = "### Prompt\n" + raw_response.strip()
+    # Clean up the response
+    raw_response = raw_response.strip()
+    
+    # Remove any text before "### Prompt"
+    if "### Prompt" in raw_response:
+        raw_response = "### Prompt" + raw_response.split("### Prompt", 1)[1]
+    elif not raw_response.startswith("### Prompt"):
+        raw_response = "### Prompt\n" + raw_response
     
     # Split into prompt and explanation
     if "---EXPLANATION---" in raw_response:
         parts = raw_response.split("---EXPLANATION---", 1)
-        return parts[0].strip(), parts[1].strip()
+        prompt_part = parts[0].strip()
+        explanation_part = parts[1].strip()
+        
+        # Remove unwanted sections from prompt (Solution Matrix, Recommended Path, etc.)
+        unwanted_markers = [
+            "### Solution Matrix",
+            "### Recommended Path", 
+            "### Alternative",
+            "| Solution |",
+            "```json",
+            "```"
+        ]
+        
+        for marker in unwanted_markers:
+            if marker in prompt_part:
+                prompt_part = prompt_part.split(marker)[0].strip()
+        
+        # Clean up explanation - take only first paragraph if too long
+        explanation_lines = explanation_part.split('\n\n')
+        if len(explanation_lines) > 1:
+            explanation_part = explanation_lines[0]
+        
+        return prompt_part, explanation_part
     
     # Add missing explanation
     return raw_response.strip(), "Prompt generated based on best practices and research."
