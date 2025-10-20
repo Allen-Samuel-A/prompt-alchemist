@@ -1,6 +1,6 @@
 # backend/core/alchemy_engine.py
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any 
 from models.chat_models import ChatMessage
 from services.openrouter_client import get_ai_response
 import logging
@@ -95,7 +95,8 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
     Returns:
         Dictionary with analysis results
     """
-    user_messages = [msg.content for msg in messages if msg.role == "user"]
+    # Use only content from user messages that are strings (ignoring any potential assistant dicts)
+    user_messages = [msg.content for msg in messages if msg.role == "user" and isinstance(msg.content, str)]
     
     # Combine all user messages to analyze
     full_conversation = " ".join(user_messages).lower()
@@ -175,41 +176,62 @@ def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage
     Returns:
         Smart question to ask, or None if ready to generate
     """
+    
+    # Fix 1: Check the last user message to see if they explicitly said "none" or "no"
+    last_user_message = messages[-1].content.lower().strip() if messages and isinstance(messages[-1].content, str) else ""
+    # Keywords that indicate the user wants to skip the current refinement step
+    skip_keywords = ['none', 'no', 'skip', 'nothing', 'not needed', 'n/a']
+    user_wants_to_skip = last_user_message in skip_keywords
+    
     # If we have enough information (score >= 70), generate the prompt
     if analysis["completeness_score"] >= 70:
         return None
     
     # If this is the first message and it's too vague, ask for more details
     if analysis["message_count"] == 1 and analysis["completeness_score"] < 25:
-        return "I'd love to help you create a great prompt! Could you tell me more about what you'd like to accomplish? For example: 'Write a professional email to resign from my job' or 'Create a Python function to sort data'."
+        # Conversational Greeting
+        return "Hello! I'm the Prompt Alchemist 🪄\n\nI'll help you create the perfect AI prompt through conversation. Just tell me what you'd like to create!\n\nExamples:\n• 'Write a resignation email to my boss'\n• 'Create a Python sorting function'\n• 'Generate a blog post about AI trends'\n\nWhat can I help you with?"
+
     
     # Ask specific questions based on what's missing
     task_type = analysis.get("task_type")
     
-    if not analysis["has_context"]:
+    # Question 1: Context
+    if not analysis["has_context"] and not user_wants_to_skip:
         if task_type == "email":
-            return "Great! To make this perfect, could you tell me:\n\n• Who is the email for? (boss, colleague, client)\n• What's the main purpose or situation?\n\nThe more context you provide, the better the prompt!"
+            return "That's a great start! To make this email perfect, could you tell me who the email is for (like a boss, colleague, or client) and what the main situation is? More context helps me craft a precise prompt for you."
         elif task_type == "code":
-            return "Sounds good! To create the best prompt, I need a bit more info:\n\n• What should the code accomplish?\n• Any specific requirements or use case?\n\nThis helps me craft a precise prompt for you."
+            return "Got it, code generation! I need a little more detail: What exactly should the code accomplish, and what's the specific use case or problem it needs to solve? That helps me zero in on the best prompt."
         elif task_type == "blog":
-            return "Excellent! Let me ask:\n\n• Who is your target audience?\n• What's the main topic or message?\n\nThis will help me create a focused prompt."
+            return "Awesome, a blog post! Who is your target audience, and what's the main idea or message you want them to take away? Focusing the audience helps a lot!"
         else:
-            return "To create the perfect prompt, could you provide more context?\n\n• What's the purpose or goal?\n• Who is the audience?\n• Any specific situation or background?\n\nMore details = better results!"
+            return "I need a bit more context to craft a really strong prompt. What's the main goal of your prompt, and who is the final audience? Knowing the purpose and the audience makes a huge difference!"
     
-    if not analysis["has_constraints"]:
+    # Question 2: Constraints
+    # We only ask for constraints if context and task are present, AND the user didn't just skip the last question.
+    if not analysis["has_constraints"] and analysis["has_context"] and analysis["has_task"]:
+        # If the user just skipped, we move to the final 'ready' question instead of re-asking constraints.
+        if user_wants_to_skip:
+            return None # Skip to final 'ready to generate'
+        
+        # If the user did not skip, ask for constraints.
         if task_type == "email":
-            return "Perfect! One more thing - any specific requirements?\n\n• Tone: Professional, casual, or formal?\n• Length preference?\n• Any key points to include or avoid?\n\n(Or type 'none' if no specific constraints)"
+            return "We're almost there! Do you have any specific constraints? For example, should the tone be professional or casual, is there a length limit, or any key points that must be included? (Just type 'none' if you're flexible!)"
         elif task_type == "code":
-            return "Almost there! Any technical constraints?\n\n• Programming language preferences?\n• Performance requirements?\n• Code style or standards?\n\n(Type 'none' if you're flexible)"
+            return "Great! For the code prompt, do you have any technical constraints? Which programming language should be used, are there performance goals, or any specific code styles required? (You can say 'none' if you're flexible!)"
         else:
-            return "Last question - any constraints or requirements?\n\n• Length or format preferences?\n• Tone or style guidelines?\n• Specific things to include or avoid?\n\n(Type 'none' if no constraints)"
+            return "Last piece of info needed: Do you have any format or style constraints? This could be a length requirement, a specific tone you need (like funny or serious), or things the AI must be sure to avoid. (Type 'none' to move on!)"
+    
+    # If we reach here and the user has skipped (or we have enough info), we proceed to generation prompt
+    if analysis["completeness_score"] >= 40 or user_wants_to_skip:
+        return None # Ready to generate!
     
     # If we have task and context but not much detail, ask for refinement
     if analysis["completeness_score"] < 50:
-        return "Thanks! To make this even better, could you add any specific details about:\n\n• The exact outcome you want\n• Any special requirements\n• The level of detail needed\n\nOr if you're happy with what you've provided, just say 'generate' and I'll create your prompt!"
+        return "Thanks! Your idea is shaping up well. Would you like to add any more specific details about the exact outcome you want or any special requirements? If not, just say 'generate' and I'll create your prompt!"
     
     # Default: we have some info, ask if they want to add more or generate
-    return "Got it! I have enough to work with. Would you like to:\n\n• Add more details? Just tell me what else you'd like\n• Generate the prompt now? Type 'generate' or 'ready'\n\nWhat works for you?"
+    return "Got it! I have enough information to create a detailed prompt. Would you like to add anything else, or should I go ahead and generate the expert prompt now? Type 'generate' when you're ready!"
 
 
 # ==========================================
@@ -423,10 +445,12 @@ async def process_chat_request(
         if len(user_messages) == 1:
             first_message = user_messages[0].content.lower().strip()
             
-            # Handle greetings
-            if first_message in ['hi', 'hello', 'hey', 'help', 'start']:
+            # Handle greetings and start of conversation
+            if first_message in ['hi', 'hello', 'hey', 'help', 'start', 'hifj', 'ello', 'hiiii', 'hey there']:
+                # Return the conversational greeting from generate_smart_question
+                greeting = generate_smart_question({"message_count": 1, "completeness_score": 0}, messages)
                 return {
-                    "expert_prompt": "Hello! I'm the Prompt Alchemist 🪄\n\nI'll help you create the perfect AI prompt through conversation. Just tell me what you'd like to create!\n\nExamples:\n• 'Write a resignation email to my boss'\n• 'Create a Python sorting function'\n• 'Generate a blog post about AI trends'\n\nWhat can I help you with?",
+                    "expert_prompt": greeting,
                     "explanation": "Starting guided conversation to understand your needs."
                 }
         
@@ -440,12 +464,15 @@ async def process_chat_request(
         ready_keywords = ['generate', 'ready', 'create it', 'make it', 'go ahead', "that's all", 'done', 'perfect']
         user_wants_to_generate = any(keyword in last_message for keyword in ready_keywords)
         
-        # Generate prompt if we have enough info OR user explicitly requests it
-        if analysis["completeness_score"] >= 70 or (user_wants_to_generate and analysis["completeness_score"] >= 40):
-            logger.info("Generating prompt - sufficient information collected")
+        # Determine if we should generate the prompt now
+        next_question = generate_smart_question(analysis, messages)
+        
+        # Generate prompt if we have enough info OR user explicitly requests it AND there's no follow-up question
+        if (analysis["completeness_score"] >= 70 or (user_wants_to_generate and analysis["completeness_score"] >= 40) or next_question is None):
+            logger.info("Generating prompt - sufficient information collected or user requested.")
             
             # Compile all user messages into context
-            user_context = "\n".join([msg.content for msg in messages if msg.role == "user"])
+            user_context = "\n".join([msg.content for msg in messages if msg.role == "user" and isinstance(msg.content, str)])
             
             system_prompt = create_system_prompt(user_context, model)
             api_messages = [ChatMessage(role="user", content=system_prompt)]
@@ -470,8 +497,6 @@ async def process_chat_request(
             return {"expert_prompt": prompt, "explanation": explanation}
         
         # Not enough info yet - ask a smart follow-up question
-        next_question = generate_smart_question(analysis, messages)
-        
         if next_question:
             return {
                 "expert_prompt": next_question,

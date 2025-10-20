@@ -117,9 +117,16 @@
       line-height: 1.6;
       letter-spacing: 0.01em;
     }
+    
+    .assistant-bubble p {
+        /* Styles for conversational text */
+        font-size: 15px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
 
     @media (max-width: 640px) {
-      pre {
+      pre, .assistant-bubble p {
         font-size: 13px;
         line-height: 1.5;
       }
@@ -342,11 +349,6 @@
 
       .chat-container-mobile {
         padding-bottom: 90px !important;
-      }
-
-      .message-bubble pre {
-        font-size: 13px;
-        line-height: 1.5;
       }
     }
 
@@ -765,16 +767,19 @@
         if (currentMode === 'visual') {
           visualForm.dispatchEvent(new Event('submit'));
         } else {
-          if (guidedForm) guidedForm.dispatchEvent(new Event('submit'));
-          if (guidedFormMobile && !guidedForm.parentElement.classList.contains('hidden')) guidedFormMobile.dispatchEvent(new Event('submit'));
+          // Determine which guided input is visible and submit
+          if (guidedForm && !guidedForm.parentElement.classList.contains('hidden')) {
+              guidedForm.dispatchEvent(new Event('submit'));
+          } else if (guidedFormMobile && !guidedFormMobile.parentElement.classList.contains('hidden')) {
+              guidedFormMobile.dispatchEvent(new Event('submit'));
+          }
         }
       }
       
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        if (confirm('Clear all chat history?')) {
-          clearChat();
-        }
+        // Custom error toast instead of confirm()
+        showError('Press Clear Chat button below the model selector to confirm deletion.', 'Note', 4000);
       }
     });
 
@@ -910,42 +915,51 @@
     // START: ADDED/UPDATED JS FUNCTIONS
     // ==========================================================
 
-    // Input validation function
+    // Input validation function (IMPROVED to catch gibberish more reliably)
     function validateInput(text) {
       const trimmed = text.trim();
       
-      // Check if input is too short or just random characters
+      // 1. Check if input is empty or too short
       if (trimmed.length < 3) {
-        return { valid: false, error: 'Please provide a more detailed description.' };
+        return { valid: false, error: 'Please provide a little more detail.' };
       }
       
-      // Check for gibberish (repeated characters)
-      const repeatedPattern = /^(.)\1{4,}$/; // 5+ same characters
+      // 2. Check for simple greetings, which are acceptable starting points
+      // Check for common greetings or the "none" keyword
+      const simpleKeywords = /^(hi|hello|hey|start|none|no|skip|ready|generate)+(!|\.|\?| )?$/i;
+      if (simpleKeywords.test(trimmed) && conversationHistory.length < 5) { // Allow simple responses early on
+        return { valid: true };
+      }
+
+      // 3. Check for repeated characters (e.g., "aaaaaaaa", "sgsgsg")
+      const repeatedPattern = /^(.)\1{4,}$|(\w{2,})\2{2,}/i;
       if (repeatedPattern.test(trimmed)) {
-        return { valid: false, error: 'Please provide a meaningful description.' };
+        return { valid: false, error: 'Please type actual words, not random keys.' };
       }
       
-      // Check for only non-alphabetic characters
-      const hasLetters = /[a-zA-Z]{2,}/.test(trimmed);
-      if (!hasLetters) {
+      // 4. Check for only non-alphabetic characters or purely numeric
+      const hasMeaningfulContent = /[a-zA-Z]{3,}/.test(trimmed);
+      if (!hasMeaningfulContent && !/(\d+)/.test(trimmed)) {
         return { valid: false, error: 'Please use actual words to describe your needs.' };
       }
       
       return { valid: true };
     }
 
-    // Show temporary error toast
-    function showError(message) {
+    // Show temporary error toast (Updated to handle different types of messages)
+    function showError(message, type = 'Error', duration = 3000) {
+      const color = type === 'Note' ? 'bg-blue-500' : 'bg-red-500';
+      
       const toast = document.createElement('div');
-      toast.className = 'fixed top-20 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fadeIn';
-      toast.textContent = message;
+      toast.className = `fixed top-20 left-1/2 -translate-x-1/2 ${color} text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fadeIn`;
+      toast.textContent = `${type}: ${message}`;
       document.body.appendChild(toast);
       
       setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transition = 'opacity 0.3s';
         setTimeout(() => toast.remove(), 300);
-      }, 3000);
+      }, duration);
     }
     
     // Clean unwanted content from AI responses
@@ -972,7 +986,7 @@
       return cleaned.trim();
     }
 
-    // New/Updated function to display assistant messages with Quality Score
+    // New/Updated function to display assistant messages with conversational distinction
     function displayAssistantMessage(content, explanation, qualityScore) {
       const msg = document.createElement('div');
       msg.className = 'flex justify-start';
@@ -980,13 +994,23 @@
       const messageDiv = document.createElement('div');
       messageDiv.className = 'message-bubble assistant-bubble';
       
+      // Check if the message is a simple question/greeting from guided mode
+      const isSimpleQuestion = !content.includes('### Prompt') && !explanation && !qualityScore;
+
       // Header with quality badge if available
       const header = document.createElement('div');
       header.className = 'flex items-center justify-between mb-3';
       
       const headerText = document.createElement('div');
       headerText.className = 'text-xs font-semibold text-gray-500';
-      headerText.textContent = 'AI SUGGESTION';
+
+      if (isSimpleQuestion) {
+        // Use a friendly title for conversational steps
+        headerText.textContent = 'PROMPT COACH'; 
+      } else {
+        // Use the default title for the final prompt output
+        headerText.textContent = 'AI SUGGESTION';
+      }
       header.appendChild(headerText);
       
       // Add quality score badge
@@ -998,13 +1022,26 @@
         header.appendChild(badge);
       }
       
-      messageDiv.appendChild(header);
+      if (!isSimpleQuestion) { // Only show the header if it's the final prompt or has a score
+        messageDiv.appendChild(header);
+      }
       
       // Content
-      const contentPre = document.createElement('pre');
-      contentPre.className = 'text-sm text-gray-900 whitespace-pre-wrap';
-      contentPre.textContent = content;
-      messageDiv.appendChild(contentPre);
+      if (isSimpleQuestion) {
+        // Use <p> for a cleaner, conversational look
+        const contentP = document.createElement('p');
+        contentP.className = 'text-sm text-gray-900 whitespace-pre-wrap';
+        contentP.textContent = content;
+        messageDiv.appendChild(contentP);
+      } else {
+        // Use <pre> for the final, structured, code-like prompt
+        const contentPre = document.createElement('pre');
+        contentPre.className = 'text-sm text-gray-900 whitespace-pre-wrap';
+        contentPre.textContent = content;
+        messageDiv.appendChild(contentPre);
+        messageDiv.appendChild(header); // Re-add header here to keep it with prompt content
+      }
+
 
       // Quality Score Details (collapsible)
       if (qualityScore) {
@@ -1032,42 +1069,51 @@
       }
 
       // Action buttons
-      const actionsDiv = document.createElement('div');
-      actionsDiv.className = 'mt-3 flex gap-3 text-xs text-gray-500';
-      
-      const copyBtn = document.createElement('button');
-      copyBtn.className = 'hover:text-black font-medium';
-      copyBtn.textContent = '📋 Copy';
-      copyBtn.onclick = function() {
-        navigator.clipboard.writeText(content).then(() => {
-          const original = this.innerHTML;
-          this.innerHTML = '✓ Copied!';
-          setTimeout(() => this.innerHTML = original, 2000);
-        });
-      };
+      if (!isSimpleQuestion) { // Only show copy/refine/delete on the final prompt
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'mt-3 flex gap-3 text-xs text-gray-500';
+        
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'hover:text-black font-medium';
+        copyBtn.textContent = '📋 Copy';
+        copyBtn.onclick = function() {
+          // Use document.execCommand for better compatibility in limited environments
+          const tempTextArea = document.createElement('textarea');
+          tempTextArea.value = content;
+          document.body.appendChild(tempTextArea);
+          tempTextArea.select();
+          try {
+            document.execCommand('copy');
+            const original = this.innerHTML;
+            this.innerHTML = '✓ Copied!';
+            setTimeout(() => this.innerHTML = original, 2000);
+          } catch (err) {
+            showError('Could not copy text to clipboard.', 'Error', 4000);
+          }
+          document.body.removeChild(tempTextArea);
+        };
 
-      // Refine button
-      const refineBtn = document.createElement('button');
-      refineBtn.className = 'hover:text-black font-medium';
-      refineBtn.textContent = '✨ Refine';
-      refineBtn.onclick = function() {
-        showRefineDialog(content);
-      };
-      
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'hover:text-black font-medium';
-      deleteBtn.textContent = '🗑️ Delete';
-      deleteBtn.onclick = function() {
-        if (confirm('Delete this message?')) {
-          msg.remove();
-          // Note: History is not updated here for simplicity, but in a real app, it should be.
-        }
-      };
-      
-      actionsDiv.appendChild(copyBtn);
-      actionsDiv.appendChild(refineBtn);
-      actionsDiv.appendChild(deleteBtn);
-      messageDiv.appendChild(actionsDiv);
+        // Refine button
+        const refineBtn = document.createElement('button');
+        refineBtn.className = 'hover:text-black font-medium';
+        refineBtn.textContent = '✨ Refine';
+        refineBtn.onclick = function() {
+          showRefineDialog(content);
+        };
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'hover:text-black font-medium';
+        deleteBtn.textContent = '🗑️ Delete';
+        deleteBtn.onclick = function() {
+          // Replacing confirm() with a custom message box for better UX
+          showError('Please use the "Clear Chat" button to manage history.', 'Note', 4000);
+        };
+        
+        actionsDiv.appendChild(copyBtn);
+        actionsDiv.appendChild(refineBtn);
+        actionsDiv.appendChild(deleteBtn);
+        messageDiv.appendChild(actionsDiv);
+      }
       
       msg.appendChild(messageDiv);
       const anchor = document.getElementById('chat-anchor');
@@ -1239,11 +1285,12 @@
       };
     }
 
-    // Updated processMessage function to handle quality scores
+    // Updated processMessage function to handle validation and quality scores
     async function processMessage(userContent) {
+      // Step 1: Frontend Validation (for gibberish, etc.)
       const validation = validateInput(userContent);
       if (!validation.valid) {
-        showError(validation.error);
+        showError(validation.error, 'Invalid Input');
         return;
       }
       
@@ -1283,6 +1330,8 @@
         
         // Clean the response before displaying
         const cleanedPrompt = cleanAIResponse(data.expert_prompt);
+        
+        // Step 2: Display and save assistant response
         displayAssistantMessage(
           cleanedPrompt, 
           data.explanation,
@@ -1301,7 +1350,11 @@
           errorMessage = '⚠️ Network error. Please check your connection.';
         }
         
-        displayAssistantMessage(errorMessage);
+        // Display generic error message to the user
+        displayAssistantMessage(errorMessage); 
+        // Save the error message to history so the flow can continue
+        saveHistory('assistant', errorMessage); 
+        
       } finally {
         spinner.classList.add('hidden');
       }
@@ -1318,7 +1371,7 @@
 
       // Validate task is provided
       if (!task) {
-        showError('Please describe the main task.');
+        showError('Please describe the main task.', 'Invalid Input');
         taskInput.focus();
         return;
       }
@@ -1326,7 +1379,7 @@
       // Validate task isn't gibberish
       const taskValidation = validateInput(task);
       if (!taskValidation.valid) {
-        showError(taskValidation.error);
+        showError(taskValidation.error, 'Invalid Input');
         taskInput.focus();
         return;
       }
@@ -1356,7 +1409,7 @@
         
         const validation = validateInput(userMessage);
         if (!validation.valid) {
-          showError(validation.error);
+          showError(validation.error, 'Invalid Input');
           return;
         }
         
@@ -1374,7 +1427,7 @@
         
         const validation = validateInput(userMessage);
         if (!validation.valid) {
-          showError(validation.error);
+          showError(validation.error, 'Invalid Input');
           return;
         }
         
@@ -1407,11 +1460,20 @@
       copyBtn.className = 'hover:text-white font-medium';
       copyBtn.textContent = '📋 Copy';
       copyBtn.onclick = function() {
-        navigator.clipboard.writeText(content).then(() => {
+        // Use document.execCommand for better compatibility in limited environments
+        const tempTextArea = document.createElement('textarea');
+        tempTextArea.value = content;
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+        try {
+          document.execCommand('copy');
           const original = this.innerHTML;
           this.innerHTML = '✓ Copied!';
           setTimeout(() => this.innerHTML = original, 2000);
-        });
+        } catch (err) {
+          showError('Could not copy text to clipboard.', 'Error', 4000);
+        }
+        document.body.removeChild(tempTextArea);
       };
       
       actionsDiv.appendChild(copyBtn);
@@ -1497,9 +1559,31 @@
     }
 
     clearChatBtn.addEventListener('click', () => {
-      if (confirm('Clear all chat history?')) {
+      // Replacing confirm() with a custom message box for better UX
+      const confirmationModal = document.createElement('div');
+      confirmationModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+      confirmationModal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-2xl max-w-sm w-full p-6 text-center">
+          <h3 class="text-lg font-semibold mb-3">Clear History?</h3>
+          <p class="text-sm text-gray-600 mb-6">Are you sure you want to delete all conversation history? This cannot be undone.</p>
+          <div class="flex gap-3 justify-center">
+            <button id="cancel-clear" class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-100 font-medium">Cancel</button>
+            <button id="confirm-clear" class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">Clear Chat</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(confirmationModal);
+      
+      document.getElementById('cancel-clear').onclick = () => confirmationModal.remove();
+      document.getElementById('confirm-clear').onclick = () => {
         clearChat();
-      }
+        confirmationModal.remove();
+      };
+
+      confirmationModal.onclick = (e) => {
+        if (e.target === confirmationModal) confirmationModal.remove();
+      };
     });
 
     // Add CSS for the new UI elements

@@ -1,7 +1,7 @@
 # backend/models/chat_models.py
 
 from pydantic import BaseModel
-from typing import List, Literal, Union, Dict
+from typing import List, Literal, Union, Dict, Any 
 
 # Pydantic models define the structure of your data.
 # They provide data validation, serialization (Python -> JSON), 
@@ -13,10 +13,9 @@ class ChatMessage(BaseModel):
     """
     role: Literal["user", "assistant"]
     
-    # --- THIS IS THE FIX ---
     # The content can now be a string (for user messages) OR
     # a dictionary/object (for assistant messages from history).
-    content: Union[str, Dict]
+    content: Union[str, Dict, Any] 
 
 class ChatRequest(BaseModel):
     """
