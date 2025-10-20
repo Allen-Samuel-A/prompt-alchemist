@@ -766,6 +766,7 @@
           visualForm.dispatchEvent(new Event('submit'));
         } else {
           if (guidedForm) guidedForm.dispatchEvent(new Event('submit'));
+          if (guidedFormMobile && !guidedForm.parentElement.classList.contains('hidden')) guidedFormMobile.dispatchEvent(new Event('submit'));
         }
       }
       
@@ -971,10 +972,275 @@
       return cleaned.trim();
     }
 
-    // Enhanced processMessage with validation
+    // New/Updated function to display assistant messages with Quality Score
+    function displayAssistantMessage(content, explanation, qualityScore) {
+      const msg = document.createElement('div');
+      msg.className = 'flex justify-start';
+      
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message-bubble assistant-bubble';
+      
+      // Header with quality badge if available
+      const header = document.createElement('div');
+      header.className = 'flex items-center justify-between mb-3';
+      
+      const headerText = document.createElement('div');
+      headerText.className = 'text-xs font-semibold text-gray-500';
+      headerText.textContent = 'AI SUGGESTION';
+      header.appendChild(headerText);
+      
+      // Add quality score badge
+      if (qualityScore && qualityScore.overall_score) {
+        const badge = document.createElement('div');
+        badge.className = `px-3 py-1 rounded-full text-xs font-bold ${getScoreBadgeClass(qualityScore.overall_score)}`;
+        badge.textContent = `${qualityScore.grade} (${qualityScore.overall_score}/100)`;
+        badge.title = `${qualityScore.estimated_success_rate}`;
+        header.appendChild(badge);
+      }
+      
+      messageDiv.appendChild(header);
+      
+      // Content
+      const contentPre = document.createElement('pre');
+      contentPre.className = 'text-sm text-gray-900 whitespace-pre-wrap';
+      contentPre.textContent = content;
+      messageDiv.appendChild(contentPre);
+
+      // Quality Score Details (collapsible)
+      if (qualityScore) {
+        const qualitySection = createQualityScoreSection(qualityScore);
+        messageDiv.appendChild(qualitySection);
+      }
+      
+      // Explanation section
+      if (explanation) {
+        const explanationBtn = document.createElement('button');
+        explanationBtn.className = 'mt-3 text-xs text-gray-600 hover:text-black font-medium';
+        explanationBtn.textContent = 'View Explanation';
+        explanationBtn.onclick = function() {
+          const explanationDiv = this.nextElementSibling;
+          explanationDiv.classList.toggle('hidden');
+          this.textContent = explanationDiv.classList.contains('hidden') ? 'View Explanation' : 'Hide Explanation';
+        };
+        
+        const explanationDiv = document.createElement('div');
+        explanationDiv.className = 'hidden mt-2 p-3 bg-gray-100 rounded text-xs text-gray-700 whitespace-pre-wrap';
+        explanationDiv.textContent = explanation;
+        
+        messageDiv.appendChild(explanationBtn);
+        messageDiv.appendChild(explanationDiv);
+      }
+
+      // Action buttons
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'mt-3 flex gap-3 text-xs text-gray-500';
+      
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'hover:text-black font-medium';
+      copyBtn.textContent = '📋 Copy';
+      copyBtn.onclick = function() {
+        navigator.clipboard.writeText(content).then(() => {
+          const original = this.innerHTML;
+          this.innerHTML = '✓ Copied!';
+          setTimeout(() => this.innerHTML = original, 2000);
+        });
+      };
+
+      // Refine button
+      const refineBtn = document.createElement('button');
+      refineBtn.className = 'hover:text-black font-medium';
+      refineBtn.textContent = '✨ Refine';
+      refineBtn.onclick = function() {
+        showRefineDialog(content);
+      };
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'hover:text-black font-medium';
+      deleteBtn.textContent = '🗑️ Delete';
+      deleteBtn.onclick = function() {
+        if (confirm('Delete this message?')) {
+          msg.remove();
+          // Note: History is not updated here for simplicity, but in a real app, it should be.
+        }
+      };
+      
+      actionsDiv.appendChild(copyBtn);
+      actionsDiv.appendChild(refineBtn);
+      actionsDiv.appendChild(deleteBtn);
+      messageDiv.appendChild(actionsDiv);
+      
+      msg.appendChild(messageDiv);
+      const anchor = document.getElementById('chat-anchor');
+      anchor.before(msg);
+      autoScroll();
+    }
+
+    function getScoreBadgeClass(score) {
+      if (score >= 90) return 'bg-green-100 text-green-800';
+      if (score >= 80) return 'bg-blue-100 text-blue-800';
+      if (score >= 70) return 'bg-yellow-100 text-yellow-800';
+      if (score >= 60) return 'bg-orange-100 text-orange-800';
+      return 'bg-red-100 text-red-800';
+    }
+
+    function getScoreColor(score) {
+      if (score >= 90) return 'text-green-600';
+      if (score >= 80) return 'text-blue-600';
+      if (score >= 70) return 'text-yellow-600';
+      if (score >= 60) return 'text-orange-600';
+      return 'text-red-600';
+    }
+
+    function getProgressBarColor(score) {
+      if (score >= 90) return 'bg-green-500';
+      if (score >= 80) return 'bg-blue-500';
+      if (score >= 70) return 'bg-yellow-500';
+      if (score >= 60) return 'bg-orange-500';
+      return 'bg-red-500';
+    }
+
+    function createQualityScoreSection(qualityScore) {
+      const section = document.createElement('div');
+      section.className = 'mt-3 border-t border-gray-200 pt-3';
+      
+      // Toggle button
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'text-xs text-gray-600 hover:text-black font-medium flex items-center gap-1';
+      toggleBtn.innerHTML = '📊 View Quality Analysis <span class="text-gray-400">▼</span>';
+      
+      // Details container (initially hidden)
+      const detailsDiv = document.createElement('div');
+      detailsDiv.className = 'hidden mt-3 space-y-3';
+      
+      // Overall score summary
+      const summaryDiv = document.createElement('div');
+      summaryDiv.className = 'bg-gray-50 rounded-lg p-3';
+      summaryDiv.innerHTML = `
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-semibold">Overall Quality</span>
+          <span class="text-lg font-bold ${getScoreColor(qualityScore.overall_score)}">${qualityScore.overall_score}/100</span>
+        </div>
+        <div class="text-xs text-gray-600">${qualityScore.estimated_success_rate}</div>
+      `;
+      detailsDiv.appendChild(summaryDiv);
+      
+      // Dimension scores with progress bars
+      if (qualityScore.dimensions) {
+        const dimensionsDiv = document.createElement('div');
+        dimensionsDiv.className = 'space-y-2';
+        
+        for (const [dimension, data] of Object.entries(qualityScore.dimensions)) {
+          const dimDiv = document.createElement('div');
+          dimDiv.innerHTML = `
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="font-medium capitalize">${dimension}</span>
+              <span class="text-gray-600">${data.score}/100</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="h-2 rounded-full ${getProgressBarColor(data.score)}" style="width: ${data.score}%"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">${data.feedback}</div>
+          `;
+          dimensionsDiv.appendChild(dimDiv);
+        }
+        
+        detailsDiv.appendChild(dimensionsDiv);
+      }
+      
+      // Strengths
+      if (qualityScore.strengths && qualityScore.strengths.length > 0) {
+        const strengthsDiv = document.createElement('div');
+        strengthsDiv.className = 'bg-green-50 rounded-lg p-3';
+        strengthsDiv.innerHTML = `
+          <div class="text-xs font-semibold text-green-800 mb-2">✓ Strengths</div>
+          <ul class="text-xs text-green-700 space-y-1 pl-4 list-disc list-inside">
+            ${qualityScore.strengths.map(s => `<li>${s}</li>`).join('')}
+          </ul>
+        `;
+        detailsDiv.appendChild(strengthsDiv);
+      }
+      
+      // Improvement suggestions
+      if (qualityScore.suggestions && qualityScore.suggestions.length > 0) {
+        const suggestionsDiv = document.createElement('div');
+        suggestionsDiv.className = 'bg-blue-50 rounded-lg p-3';
+        suggestionsDiv.innerHTML = `
+          <div class="text-xs font-semibold text-blue-800 mb-2">💡 Suggestions</div>
+          <ul class="text-xs text-blue-700 space-y-1 pl-4 list-disc list-inside">
+            ${qualityScore.suggestions.map(s => `<li>${s}</li>`).join('')}
+          </ul>
+        `;
+        detailsDiv.appendChild(suggestionsDiv);
+      }
+      
+      // Toggle functionality
+      toggleBtn.onclick = function() {
+        detailsDiv.classList.toggle('hidden');
+        const arrow = this.querySelector('span');
+        arrow.textContent = detailsDiv.classList.contains('hidden') ? '▼' : '▲';
+      };
+      
+      section.appendChild(toggleBtn);
+      section.appendChild(detailsDiv);
+      
+      return section;
+    }
+
+    function showRefineDialog(currentPrompt) {
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+      modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
+          <h3 class="text-lg font-semibold mb-4">Refine Your Prompt</h3>
+          <p class="text-sm text-gray-600 mb-4">How would you like to improve this prompt?</p>
+          
+          <div class="space-y-2 mb-4">
+            <button class="refine-option w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-black hover:bg-gray-50 transition" data-refine-action="Make this prompt more specific with concrete details and examples">
+              <div class="font-medium text-sm">Make it more specific</div>
+              <div class="text-xs text-gray-500">Add more details and concrete examples</div>
+            </button>
+            
+            <button class="refine-option w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-black hover:bg-gray-50 transition" data-refine-action="Make this prompt more technical with advanced terminology and depth">
+              <div class="font-medium text-sm">Make it more technical</div>
+              <div class="text-xs text-gray-500">Increase depth and technical terminology</div>
+            </button>
+            
+            <button class="refine-option w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-black hover:bg-gray-50 transition" data-refine-action="Simplify this prompt and make it more accessible">
+              <div class="font-medium text-sm">Make it simpler</div>
+              <div class="text-xs text-gray-500">Simplify language and reduce complexity</div>
+            </button>
+            
+            <button class="refine-option w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-black hover:bg-gray-50 transition" data-refine-action="Add 2-3 concrete examples to this prompt">
+              <div class="font-medium text-sm">Add examples</div>
+              <div class="text-xs text-gray-500">Include concrete examples and use cases</div>
+            </button>
+          </div>
+          
+          <button class="close-modal w-full px-4 py-2 text-sm text-gray-600 hover:text-black font-medium">Cancel</button>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      // Handle refinement options
+      modal.querySelectorAll('.refine-option').forEach((btn) => {
+        btn.onclick = async () => {
+          const refinement = btn.dataset.refineAction;
+          
+          modal.remove();
+          // The refinement prompt is prepended to the user's message
+          await processMessage(`${refinement}. The prompt to be refined is: "${currentPrompt}"`);
+        };
+      });
+      
+      modal.querySelector('.close-modal').onclick = () => modal.remove();
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+      };
+    }
+
+    // Updated processMessage function to handle quality scores
     async function processMessage(userContent) {
-      // Validation should ideally happen before calling this function, 
-      // but we keep a check here for robustness if called from another place.
       const validation = validateInput(userContent);
       if (!validation.valid) {
         showError(validation.error);
@@ -1017,7 +1283,11 @@
         
         // Clean the response before displaying
         const cleanedPrompt = cleanAIResponse(data.expert_prompt);
-        displayAssistantMessage(cleanedPrompt, data.explanation);
+        displayAssistantMessage(
+          cleanedPrompt, 
+          data.explanation,
+          data.quality_score // Pass quality score if it exists
+        );
         saveHistory('assistant', cleanedPrompt);
         
       } catch (error) {
@@ -1134,12 +1404,12 @@
       actionsDiv.className = 'mt-2 flex gap-3 text-xs text-gray-400';
       
       const copyBtn = document.createElement('button');
-      copyBtn.className = 'hover:text-white';
-      copyBtn.textContent = 'Copy';
+      copyBtn.className = 'hover:text-white font-medium';
+      copyBtn.textContent = '📋 Copy';
       copyBtn.onclick = function() {
         navigator.clipboard.writeText(content).then(() => {
           const original = this.innerHTML;
-          this.innerHTML = 'Copied!';
+          this.innerHTML = '✓ Copied!';
           setTimeout(() => this.innerHTML = original, 2000);
         });
       };
@@ -1148,73 +1418,6 @@
       messageDiv.appendChild(actionsDiv);
       msg.appendChild(messageDiv);
       
-      const anchor = document.getElementById('chat-anchor');
-      anchor.before(msg);
-      autoScroll();
-    }
-
-    function displayAssistantMessage(content, explanation) {
-      const msg = document.createElement('div');
-      msg.className = 'flex justify-start';
-      
-      const messageDiv = document.createElement('div');
-      messageDiv.className = 'message-bubble assistant-bubble';
-      
-      const header = document.createElement('div');
-      header.className = 'text-xs font-semibold text-gray-500 mb-2';
-      header.textContent = 'AI SUGGESTION';
-      
-      const contentPre = document.createElement('pre');
-      contentPre.className = 'text-sm text-gray-900';
-      contentPre.textContent = content;
-      
-      messageDiv.appendChild(header);
-      messageDiv.appendChild(contentPre);
-
-      if (explanation) {
-        const explanationBtn = document.createElement('button');
-        explanationBtn.className = 'mt-2 text-xs text-gray-600 hover:text-black font-medium';
-        explanationBtn.textContent = 'View Explanation';
-        explanationBtn.onclick = function() {
-          const explanationDiv = this.nextElementSibling;
-          explanationDiv.classList.toggle('hidden');
-          this.textContent = explanationDiv.classList.contains('hidden') ? 'View Explanation' : 'Hide Explanation';
-        };
-        
-        const explanationDiv = document.createElement('div');
-        explanationDiv.className = 'hidden mt-2 p-3 bg-gray-100 rounded text-xs text-gray-700 whitespace-pre-wrap';
-        explanationDiv.textContent = explanation;
-        
-        messageDiv.appendChild(explanationBtn);
-        messageDiv.appendChild(explanationDiv);
-      }
-
-      const actionsDiv = document.createElement('div');
-      actionsDiv.className = 'mt-2 flex gap-3 text-xs text-gray-500';
-      
-      const copyBtn = document.createElement('button');
-      copyBtn.className = 'hover:text-black';
-      copyBtn.textContent = 'Copy';
-      copyBtn.onclick = function() {
-        navigator.clipboard.writeText(content).then(() => {
-          const original = this.innerHTML;
-          this.innerHTML = 'Copied!';
-          setTimeout(() => this.innerHTML = original, 2000);
-        });
-      };
-      
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'hover:text-black';
-      deleteBtn.textContent = 'Delete';
-      deleteBtn.onclick = function() {
-        msg.remove();
-      };
-      
-      actionsDiv.appendChild(copyBtn);
-      actionsDiv.appendChild(deleteBtn);
-      messageDiv.appendChild(actionsDiv);
-      
-      msg.appendChild(messageDiv);
       const anchor = document.getElementById('chat-anchor');
       anchor.before(msg);
       autoScroll();
@@ -1233,6 +1436,7 @@
       
       conversationHistory = conversationHistory.map(msg => {
         if (msg.role === 'assistant' && typeof msg.content === 'object') {
+          // Flatten the old structure to simple text content for loading
           return {
             role: 'assistant',
             content: msg.content.expert_prompt || msg.content.explanation || ''
@@ -1247,7 +1451,7 @@
           if (msg.role === 'user') {
             displayUserMessage(msg.content);
           } else if (msg.role === 'assistant') {
-            // Note: Explanation is not saved in history with the content, so we pass undefined
+            // Note: Explanation and quality scores are not stored in the simple history, so we pass undefined
             displayAssistantMessage(msg.content); 
           }
         });
@@ -1297,6 +1501,22 @@
         clearChat();
       }
     });
+
+    // Add CSS for the new UI elements
+    const qualityScoreStyles = `
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      
+      .pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+    `;
+
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = qualityScoreStyles;
+    document.head.appendChild(styleSheet);
   </script>
 </body>
 </html>
