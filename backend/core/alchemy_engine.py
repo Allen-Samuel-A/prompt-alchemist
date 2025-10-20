@@ -132,7 +132,7 @@ def classify_intent(user_context: str) -> str:
     return "general"
 
 # ==========================================
-# CONVERSATION INTELLIGENCE (No Change)
+# CONVERSATION INTELLIGENCE
 # ==========================================
 def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
     """
@@ -164,7 +164,7 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
         analysis["has_task"] = True
         analysis["completeness_score"] += 25
         
-        # Identify task type
+        # Identify task type (USED by the smart question function)
         if any(word in full_conversation for word in ["email", "letter", "message"]):
             analysis["task_type"] = "email"
         elif any(word in full_conversation for word in ["code", "function", "script", "program"]):
@@ -173,6 +173,9 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
             analysis["task_type"] = "blog"
         elif any(word in full_conversation for word in ["campaign", "marketing", "ad"]):
             analysis["task_type"] = "marketing"
+        # NEW: Add check for creative writing task type
+        elif any(word in full_conversation for word in ["story", "novel", "poem", "fiction"]):
+            analysis["task_type"] = "creative"
     
     # Detect role/expertise mentions
     role_indicators = [
@@ -188,7 +191,10 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
         "for", "audience", "purpose", "background", "about", "regarding",
         "boss", "client", "customer", "user", "team", "company", "project"
     ]
-    if any(indicator in full_conversation for indicator in context_indicators):
+    # We now also check for creative writing context keywords like setting/genre/character
+    creative_context_indicators = ["setting", "genre", "character", "world-building", "tone", "mood", "style"]
+    
+    if any(indicator in full_conversation for indicator in context_indicators + creative_context_indicators):
         analysis["has_context"] = True
         analysis["completeness_score"] += 25
     
@@ -211,7 +217,6 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
 def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage]) -> Optional[str]:
     """
     Generates an intelligent follow-up question based on what's missing.
-    (Existing Function - No Change)
     """
     
     # Fix 1: Check the last user message to see if they explicitly said "none" or "no"
@@ -241,6 +246,9 @@ def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage
             return "Got it, code generation! I need a little more detail: What exactly should the code accomplish, and what's the specific use case or problem it needs to solve? That helps me zero in on the best prompt."
         elif task_type == "blog":
             return "Awesome, a blog post! Who is your target audience, and what's the main idea or message you want them to take away? Focusing the audience helps a lot!"
+        # NEW: Custom question for Creative Tasks (since they often lack structure/tone info)
+        elif task_type == "creative":
+            return "Fantastic! For a great story prompt, we need some narrative structure. What is the desired **tone** (e.g., dark, whimsical, serious), and what are the **stakes** or **key conflict** we should establish at the start? Telling me the genre also helps!"
         else:
             return "I need a bit more context to craft a really strong prompt. What's the main goal of your prompt, and who is the final audience? Knowing the purpose and the audience makes a huge difference!"
     
@@ -256,6 +264,9 @@ def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage
             return "We're almost there! Do you have any specific constraints? For example, should the tone be professional or casual, is there a length limit, or any key points that must be included? (Just type 'none' if you're flexible!)"
         elif task_type == "code":
             return "Great! For the code prompt, do you have any technical constraints? Which programming language should be used, are there performance goals, or any specific code styles required? (You can say 'none' if you're flexible!)"
+        # NEW: Custom constraint question for Creative Tasks
+        elif task_type == "creative":
+             return "Almost ready! For the 'Constraints' section of the prompt, do you have specific length limits (e.g., 500 words), style requirements (e.g., use sensory details), or characters that must be included? (Type 'none' if you're flexible!)"
         else:
             return "Last piece of info needed: Do you have any format or style constraints? This could be a length requirement, a specific tone you need (like funny or serious), or things the AI must be sure to avoid. (Type 'none' to move on!)"
     
@@ -272,19 +283,11 @@ def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage
 
 
 # ==========================================
-# PROMPT ENGINEERING
+# PROMPT ENGINEERING (No Change)
 # ==========================================
 def create_system_prompt(user_idea: str, target_model: str, task_category: str) -> str:
     """
     Generates an optimized system prompt for the Prompt Alchemist.
-    
-    Args:
-        user_idea: User's input describing their prompt requirements
-        target_model: Target LLM model for optimization
-        task_category: The classified intent (e.g., 'code_generation')
-        
-    Returns:
-        Complete system prompt with research and dynamic example injection.
     """
     research = get_research_data(f"prompting techniques for {target_model}")
     
@@ -395,7 +398,7 @@ async def call_ai_with_fallback(
                 continue
             
             # All models failed
-            return "", error_msg
+            return "", "All models exhausted"
     
     return "", "All models exhausted"
 
