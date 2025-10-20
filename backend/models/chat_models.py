@@ -1,30 +1,26 @@
-# backend/models/chat_models.py
+# backend/models/chat_models.py (CORRECTED CODE)
 
 from pydantic import BaseModel
-# UPDATED: Added Optional to imports, as it's needed for quality_score
+# UPDATED: We need Optional for the ChatResponse model
 from typing import List, Literal, Union, Dict, Any, Optional 
 
 # Pydantic models define the structure of your data.
-# They provide data validation, serialization (Python -> JSON), 
-# and deserialization (JSON -> Python).
 
 class ChatMessage(BaseModel):
     """
     Represents a single message in the conversation.
+    (Used internally by the alchemy_engine)
     """
     role: Literal["user", "assistant"]
-    
-    # The content can now be a string (for user messages) OR
-    # a dictionary/object (for assistant messages from history).
     content: Union[str, Dict, Any] 
 
 class ChatRequest(BaseModel):
     """
     Represents the request body that the frontend will send to our chat endpoint.
     """
-    # Note: Even though the frontend sends List[Dict], Pydantic automatically 
-    # converts this into List[ChatMessage] objects during validation.
-    messages: List[ChatMessage]
+    # CRITICAL FIX: The frontend sends raw JSON dicts, so we must tell Pydantic 
+    # to expect a list of Dictionaries, not a list of ChatMessage objects.
+    messages: List[Dict[str, str]] # <--- CHANGED BACK TO LIST[DICT[STR, STR]]
     
     target_model: str
     
@@ -33,7 +29,6 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     """
     Represents the structured response body returned by the API.
-    (ADDED from the old chat.py)
     """
     expert_prompt: str
     explanation: str = ""
