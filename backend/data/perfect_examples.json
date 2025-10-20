@@ -1,0 +1,27 @@
+{
+  "code_generation": {
+    "title": "Senior Python Engineer Task",
+    "example": "Role: You are a Senior Python Developer specializing in asynchronous web scraping and performance optimization. Task: Write a complete, tested, and high-performance Python function using the 'httpx' library to fetch data from a list of 10 external API endpoints concurrently. Context: The function is for a critical data aggregation service where the response time must be under 500ms. Constraints: Must include type hinting for all arguments and returns, comprehensive error handling (timeouts, 404s, 500s), and return the results as a list of validated Pydantic objects.",
+    "instructions": "When generating a prompt for CODE, emphasize programming language, frameworks (e.g., React, FastAPI, specific Python libraries), performance requirements, security considerations (like input sanitation), and required output formats (e.g., JSON, Pydantic model)."
+  },
+  "formal_email": {
+    "title": "Diplomatic HR Communications Expert",
+    "example": "Role: You are an HR Communications Specialist, highly skilled at writing diplomatic, clear, and actionable internal memos and announcements. Task: Draft a formal, positive email announcement to the entire company about an upcoming mandatory system maintenance period that will affect all user access for 4 hours. Context: The goal is to inform without causing panic, emphasizing improved security as the main benefit. Constraints: Maintain a professional but warm tone, keep the body under 150 words, include the exact date/time in bold, provide a clear, one-sentence action item for employees, and include a contact for questions.",
+    "instructions": "When generating a prompt for EMAIL, specify the recipient, the required tone (e.g., friendly, diplomatic, urgent), the required length, and any critical elements that must be included (e.g., Call-to-Action, specific dates)."
+  },
+  "marketing_campaign": {
+    "title": "Growth-Focused Digital Strategy Director",
+    "example": "Role: You are a Digital Strategy Director for a direct-to-consumer (DTC) wellness brand, expert in viral marketing and measurable growth campaigns. Task: Create three distinct social media post variations (Instagram Reel concept, Twitter/X thread, LinkedIn article summary) to launch a new line of organic protein bars. Context: The primary audience is health-conscious professionals aged 25-40. The campaign's goal is a 10% increase in website traffic in the first week. Constraints: The Instagram post must focus on a 15-second visual concept, the X thread must tag two industry leaders, and the LinkedIn post must include a high-value insight about food science.",
+    "instructions": "When generating a prompt for MARKETING, define the specific platform(s), the target audience, the key performance indicator (KPI), and required structural elements (e.g., video script, hashtag strategy, required image descriptions)."
+  },
+  "image_generation": {
+    "title": "Cinematic Visual Director Prompt",
+    "example": "Role: You are a cinematic director providing a highly descriptive prompt to a Midjourney/Stable Diffusion model. Task: Generate a hyper-realistic photograph of a lone medieval knight standing on a wind-swept cliff overlooking a turbulent, foggy ocean at sunset. Context: The image should evoke feelings of isolation, determination, and epic fantasy. Constraints: Use a 16:9 aspect ratio, specify 'photorealistic,' 'Unreal Engine 5,' 'volumetric lighting,' 'golden hour,' and ensure the knight's armor is highly detailed and rusted.",
+    "instructions": "When generating a prompt for IMAGE, mandate high levels of detail, specify style (e.g., cinematic, anime, oil painting), lighting conditions (e.g., volumetric, soft, neon), and resolution/aspect ratio."
+  },
+  "general": {
+    "title": "General Purpose Prompt Expert",
+    "example": "Role: You are a versatile expert assistant capable of handling any task, ensuring clarity, completeness, and focus. Task: Clearly define the objective, deliverables, and success criteria for the user's request. Context: Ensure the prompt is structured to minimize ambiguity and lead to a highly useful output. Constraints: All four primary components (Role, Task, Context, Constraints) must be present and equally detailed.",
+    "instructions": "For general tasks, focus on defining the target audience, clarifying the core problem, and setting strict output formats to guarantee quality."
+  }
+}

@@ -5,9 +5,34 @@ from models.chat_models import ChatMessage
 from services.openrouter_client import get_ai_response
 import logging
 import re
+import json
+from pathlib import Path
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# --- NEW: JSON Loader Utility ---
+def load_perfect_examples() -> Dict:
+    """Loads the perfect prompt examples from the JSON file."""
+    try:
+        # Assumes the data folder is parallel to the core folder
+        file_path = Path(__file__).parent.parent / 'data' / 'perfect_examples.json'
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load perfect_examples.json: {e}")
+        # Return only the essential 'general' category as a safe fallback
+        return {
+            "general": {
+                "title": "General Purpose Prompt Expert",
+                "example": "Role: Expert AI Assistant. Task: Complete the user's objective clearly. Context: Ensure high-quality results. Constraints: All four primary components must be present.",
+                "instructions": "Focus on defining the target audience and setting strict output formats."
+            }
+        }
+
+# Load the examples once at startup
+PERFECT_EXAMPLES = load_perfect_examples()
+
 
 # ==========================================
 # CONFIGURATION
@@ -62,12 +87,6 @@ class ModelConfig:
 def get_research_data(query: str) -> str:
     """
     Retrieves model-specific research data using optimized lookup.
-    
-    Args:
-        query: Search query containing model information
-        
-    Returns:
-        Research guidelines for the specified model family
     """
     logger.info(f"Fetching research data for query: {query}")
     
@@ -81,19 +100,41 @@ def get_research_data(query: str) -> str:
     
     return ModelConfig.RESEARCH_DATA["default"]
 
+# --- NEW: INTENT CLASSIFICATION FUNCTION ---
+def classify_intent(user_context: str) -> str:
+    """
+    Classifies the user's intent based on keywords for example injection.
+    Using keyword matching for performance and reliability (safer than LLM call).
+    """
+    context_lower = user_context.lower()
+    
+    # Code Generation Keywords
+    if any(k in context_lower for k in ["code", "function", "script", "python", "javascript", "react", "html", "css", "ts"]):
+        return "code_generation"
+    
+    # Formal Email/Document Keywords
+    if any(k in context_lower for k in ["email", "letter", "memo", "announcement", "resignation", "formal"]):
+        return "formal_email"
+    
+    # Marketing/Campaign Keywords
+    if any(k in context_lower for k in ["marketing", "campaign", "social media", "ad", "copywriting", "launch"]):
+        return "marketing_campaign"
+        
+    # Image/Visual Generation Keywords
+    if any(k in context_lower for k in ["image", "picture", "photo", "render", "style", "cinematic", "visual"]):
+        return "image_generation"
+    
+    # Default/General Purpose
+    return "general"
 
 # ==========================================
-# CONVERSATION INTELLIGENCE
+# CONVERSATION INTELLIGENCE (Remainder of file is the existing logic 
+# with the exception of the updated system prompt function)
 # ==========================================
 def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
     """
     Analyzes the conversation to understand what information has been gathered.
-    
-    Args:
-        messages: List of conversation messages
-        
-    Returns:
-        Dictionary with analysis results
+    (Existing Function - No Change)
     """
     # Use only content from user messages that are strings (ignoring any potential assistant dicts)
     user_messages = [msg.content for msg in messages if msg.role == "user" and isinstance(msg.content, str)]
@@ -168,13 +209,7 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
 def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage]) -> Optional[str]:
     """
     Generates an intelligent follow-up question based on what's missing.
-    
-    Args:
-        analysis: Analysis results from analyze_conversation
-        messages: Conversation history
-        
-    Returns:
-        Smart question to ask, or None if ready to generate
+    (Existing Function - No Change)
     """
     
     # Fix 1: Check the last user message to see if they explicitly said "none" or "no"
@@ -237,18 +272,25 @@ def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage
 # ==========================================
 # PROMPT ENGINEERING
 # ==========================================
-def create_system_prompt(user_idea: str, target_model: str) -> str:
+def create_system_prompt(user_idea: str, target_model: str, task_category: str) -> str: # <--- UPDATED SIGNATURE
     """
     Generates an optimized system prompt for the Prompt Alchemist.
     
     Args:
         user_idea: User's input describing their prompt requirements
         target_model: Target LLM model for optimization
+        task_category: The classified intent (e.g., 'code_generation')
         
     Returns:
-        Complete system prompt with research integration
+        Complete system prompt with research and dynamic example injection.
     """
     research = get_research_data(f"prompting techniques for {target_model}")
+    
+    # Get the perfect example and custom instructions based on intent
+    context_data = PERFECT_EXAMPLES.get(task_category, PERFECT_EXAMPLES["general"]) 
+    perfect_example = context_data["example"]
+    category_instructions = context_data["instructions"]
+    category_title = context_data["title"]
     
     return f"""You are 'Prompt Alchemist', an expert AI prompt engineer specializing in creating 
 production-ready prompts optimized for {target_model}.
@@ -285,6 +327,11 @@ Every enhanced prompt MUST include these four components with SUBSTANTIAL DETAIL
 **Context:** [Add relevant background, audience details, use case scenarios, and environmental factors]
 **Constraints:** [Expand with quality standards, format requirements, style guidelines, and boundaries]
 
+### TARGETED INSTRUCTIONS AND PERFECT EXAMPLE ({category_title.upper()})
+1. Follow the '{category_title}' example structure and level of detail precisely.
+2. Ensure the generated prompt includes the specific instructions below:
+{category_instructions}
+
 ### RESEARCH-BACKED GUIDELINES FOR {target_model.upper()}
 {research}
 
@@ -316,7 +363,7 @@ Now create the enhanced prompt following this exact format."""
 
 
 # ==========================================
-# API INTERACTION WITH RETRY LOGIC
+# API INTERACTION WITH RETRY LOGIC (Existing functions - No Change)
 # ==========================================
 async def call_ai_with_fallback(
     messages: List[ChatMessage],
@@ -324,13 +371,6 @@ async def call_ai_with_fallback(
 ) -> Tuple[str, Optional[str]]:
     """
     Calls AI API with fallback strategy for reliability.
-    
-    Args:
-        messages: List of chat messages for the API
-        primary_model: Primary model to attempt first
-        
-    Returns:
-        Tuple of (response_text, error_message)
     """
     models_to_try = [primary_model] + ModelConfig.FALLBACK_MODELS
     
@@ -361,13 +401,7 @@ async def call_ai_with_fallback(
 def format_response(raw_response: str) -> Tuple[str, str]:
     """
     Ensures consistent response formatting with prompt and explanation.
-    Cleans up unwanted content like solution matrices and recommended paths.
-    
-    Args:
-        raw_response: Raw AI response text
-        
-    Returns:
-        Tuple of (expert_prompt, explanation)
+    (Existing Function - No Change)
     """
     # Clean up the response
     raw_response = raw_response.strip()
@@ -419,14 +453,6 @@ async def process_chat_request(
 ) -> Dict[str, str]:
     """
     Main entry point for processing chat requests in both modes.
-    
-    Args:
-        messages: Conversation history
-        model: Target LLM model for optimization
-        mode: "guided" or "visual" builder mode
-        
-    Returns:
-        Dictionary with expert_prompt and explanation keys
     """
     if not messages:
         logger.error("Empty messages list received")
@@ -435,6 +461,9 @@ async def process_chat_request(
             "explanation": "Unable to process empty conversation."
         }
     
+    # Compile all user messages into context for analysis and generation
+    user_context = "\n".join([msg.content for msg in messages if msg.role == "user" and isinstance(msg.content, str)])
+
     # ==========================================
     # GUIDED MODE: Intelligent conversation flow
     # ==========================================
@@ -471,10 +500,10 @@ async def process_chat_request(
         if (analysis["completeness_score"] >= 70 or (user_wants_to_generate and analysis["completeness_score"] >= 40) or next_question is None):
             logger.info("Generating prompt - sufficient information collected or user requested.")
             
-            # Compile all user messages into context
-            user_context = "\n".join([msg.content for msg in messages if msg.role == "user" and isinstance(msg.content, str)])
+            # --- NEW: CLASSIFY INTENT ---
+            task_category = classify_intent(user_context)
             
-            system_prompt = create_system_prompt(user_context, model)
+            system_prompt = create_system_prompt(user_context, model, task_category) # <--- UPDATED CALL
             api_messages = [ChatMessage(role="user", content=system_prompt)]
             
             # Call API with fallback
@@ -517,7 +546,10 @@ async def process_chat_request(
         if not isinstance(last_user_message, str):
             last_user_message = str(last_user_message)
         
-        system_prompt = create_system_prompt(last_user_message, model)
+        # --- NEW: CLASSIFY INTENT ---
+        task_category = classify_intent(last_user_message)
+
+        system_prompt = create_system_prompt(last_user_message, model, task_category) # <--- UPDATED CALL
         api_messages = [ChatMessage(role="user", content=system_prompt)]
         
         # Call API with fallback
