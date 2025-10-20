@@ -11,7 +11,7 @@ from pathlib import Path
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# --- NEW: JSON Loader Utility ---
+# --- JSON Loader Utility ---
 def load_perfect_examples() -> Dict:
     """Loads the perfect prompt examples from the JSON file."""
     try:
@@ -35,7 +35,7 @@ PERFECT_EXAMPLES = load_perfect_examples()
 
 
 # ==========================================
-# CONFIGURATION
+# CONFIGURATION (No Change)
 # ==========================================
 class ModelConfig:
     """Centralized model configuration with fallback strategy"""
@@ -100,11 +100,11 @@ def get_research_data(query: str) -> str:
     
     return ModelConfig.RESEARCH_DATA["default"]
 
-# --- NEW: INTENT CLASSIFICATION FUNCTION ---
+# --- UPDATED: INTENT CLASSIFICATION FUNCTION ---
 def classify_intent(user_context: str) -> str:
     """
     Classifies the user's intent based on keywords for example injection.
-    Using keyword matching for performance and reliability (safer than LLM call).
+    Now includes the new 'creative_writing' category.
     """
     context_lower = user_context.lower()
     
@@ -123,18 +123,20 @@ def classify_intent(user_context: str) -> str:
     # Image/Visual Generation Keywords
     if any(k in context_lower for k in ["image", "picture", "photo", "render", "style", "cinematic", "visual"]):
         return "image_generation"
+        
+    # NEW: Creative Writing Keywords
+    if any(k in context_lower for k in ["story", "novel", "poem", "fiction", "character", "plot", "world-building"]):
+        return "creative_writing"
     
     # Default/General Purpose
     return "general"
 
 # ==========================================
-# CONVERSATION INTELLIGENCE (Remainder of file is the existing logic 
-# with the exception of the updated system prompt function)
+# CONVERSATION INTELLIGENCE (No Change)
 # ==========================================
 def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, any]:
     """
     Analyzes the conversation to understand what information has been gathered.
-    (Existing Function - No Change)
     """
     # Use only content from user messages that are strings (ignoring any potential assistant dicts)
     user_messages = [msg.content for msg in messages if msg.role == "user" and isinstance(msg.content, str)]
@@ -272,7 +274,7 @@ def generate_smart_question(analysis: Dict[str, any], messages: List[ChatMessage
 # ==========================================
 # PROMPT ENGINEERING
 # ==========================================
-def create_system_prompt(user_idea: str, target_model: str, task_category: str) -> str: # <--- UPDATED SIGNATURE
+def create_system_prompt(user_idea: str, target_model: str, task_category: str) -> str:
     """
     Generates an optimized system prompt for the Prompt Alchemist.
     
@@ -363,7 +365,7 @@ Now create the enhanced prompt following this exact format."""
 
 
 # ==========================================
-# API INTERACTION WITH RETRY LOGIC (Existing functions - No Change)
+# API INTERACTION WITH RETRY LOGIC (No Change)
 # ==========================================
 async def call_ai_with_fallback(
     messages: List[ChatMessage],
@@ -444,7 +446,7 @@ def format_response(raw_response: str) -> Tuple[str, str]:
 
 
 # ==========================================
-# MAIN PROCESSING LOGIC
+# MAIN PROCESSING LOGIC (No Change)
 # ==========================================
 async def process_chat_request(
     messages: List[ChatMessage],
@@ -500,10 +502,10 @@ async def process_chat_request(
         if (analysis["completeness_score"] >= 70 or (user_wants_to_generate and analysis["completeness_score"] >= 40) or next_question is None):
             logger.info("Generating prompt - sufficient information collected or user requested.")
             
-            # --- NEW: CLASSIFY INTENT ---
+            # --- CLASSIFY INTENT ---
             task_category = classify_intent(user_context)
             
-            system_prompt = create_system_prompt(user_context, model, task_category) # <--- UPDATED CALL
+            system_prompt = create_system_prompt(user_context, model, task_category)
             api_messages = [ChatMessage(role="user", content=system_prompt)]
             
             # Call API with fallback
@@ -546,10 +548,10 @@ async def process_chat_request(
         if not isinstance(last_user_message, str):
             last_user_message = str(last_user_message)
         
-        # --- NEW: CLASSIFY INTENT ---
+        # --- CLASSIFY INTENT ---
         task_category = classify_intent(last_user_message)
 
-        system_prompt = create_system_prompt(last_user_message, model, task_category) # <--- UPDATED CALL
+        system_prompt = create_system_prompt(last_user_message, model, task_category)
         api_messages = [ChatMessage(role="user", content=system_prompt)]
         
         # Call API with fallback
