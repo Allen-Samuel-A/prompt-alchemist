@@ -48,3 +48,13 @@ class ChatResponse(BaseModel):
     expert_prompt: str
     explanation: str = ""
     quality_score: Optional[AuditResult] = None # Updated to use AuditResult
+
+class RefineRequest(BaseModel):
+    """
+    Request body for the refine endpoint.
+    Sent when user clicks the 'Refine' button after receiving a generated prompt.
+    """
+    original_prompt: str = Field(..., description="The prompt to be refined")
+    framework_suggestion: str = Field(..., description="The optimization framework to inject (CoT, ToT, etc.)")
+    target_model: str = Field(..., description="The AI model to use for refinement")
+    task_category: str = Field(default="general", description="Category of the task (blog, code, etc.)")
