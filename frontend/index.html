@@ -914,7 +914,7 @@
     });
 
     // ==========================================================
-    // START: ADDED/UPDATED JS FUNCTIONS
+    // START: UPDATED JS FUNCTIONS
     // ==========================================================
 
     // Input validation function (IMPROVED to catch gibberish more reliably)
@@ -928,7 +928,7 @@
       
       // 2. Check for simple greetings, which are acceptable starting points
       // Check for common greetings or the "none" keyword
-      const simpleKeywords = /^(hi|hello|hey|start|none|no|skip|ready|generate)+(!|\.|\?| )?$/i;
+      const simpleKeywords = /^(hi|hello|hey|start|none|no|skip|ready|generate|hELLO)+(!|\.|\?| )?$/i;
       if (simpleKeywords.test(trimmed) && conversationHistory.length < 5) { // Allow simple responses early on
         return { valid: true };
       }
@@ -997,7 +997,7 @@
       messageDiv.className = 'message-bubble assistant-bubble';
       
       // Check if the message is a simple question/greeting from guided mode
-      const isSimpleQuestion = !content.includes('### Prompt') && !explanation && !qualityScore;
+      const isSimpleQuestion = !content.includes('### Prompt') && !qualityScore;
 
       // Header with quality badge if available
       const header = document.createElement('div');
@@ -1100,7 +1100,12 @@
         refineBtn.className = 'hover:text-black font-medium';
         refineBtn.textContent = '✨ Refine';
         refineBtn.onclick = function() {
-          showRefineDialog(content);
+          // Pass the refinement suggestions from the quality score
+          const customSuggestion = (qualityScore && qualityScore.suggestions && qualityScore.suggestions.length > 0) 
+            ? qualityScore.suggestions[0] // Assume the first suggestion is the advanced framework one (Layer 5)
+            : 'Make this prompt more specific with concrete details and examples'; // Default fallback
+            
+          showRefineDialog(content, customSuggestion);
         };
         
         const deleteBtn = document.createElement('button');
@@ -1122,6 +1127,17 @@
       anchor.before(msg);
       autoScroll();
     }
+    
+    // Helper function to extract the refinement action from the first suggestion (Layer 5)
+    // This assumes the backend has been updated to provide a more specific action text
+    function getRefineActionFromSuggestion(suggestionText) {
+        if (suggestionText.includes('CoVe')) return 'Refine using CoVe Framework';
+        if (suggestionText.includes('AIDA')) return 'Refine using AIDA Framework';
+        if (suggestionText.includes('CoT-Llama')) return 'Refine using CoT-Llama Planning';
+        if (suggestionText.includes('Few-Shot')) return 'Refine with Few-Shot Examples';
+        return 'Make it more specific';
+    }
+
 
     function getScoreBadgeClass(score) {
       if (score >= 90) return 'bg-green-100 text-green-800';
@@ -1234,15 +1250,25 @@
       return section;
     }
 
-    function showRefineDialog(currentPrompt) {
+    // UPDATED: ShowRefineDialog now uses the advanced suggestion from the audit
+    function showRefineDialog(currentPrompt, advancedSuggestion) {
       const modal = document.createElement('div');
       modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+      
+      const advancedAction = getRefineActionFromSuggestion(advancedSuggestion);
+
       modal.innerHTML = `
         <div class="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
           <h3 class="text-lg font-semibold mb-4">Refine Your Prompt</h3>
-          <p class="text-sm text-gray-600 mb-4">How would you like to improve this prompt?</p>
+          <p class="text-sm text-gray-600 mb-4">Choose a refinement path below to further enhance the prompt quality:</p>
           
           <div class="space-y-2 mb-4">
+            
+            <button class="refine-option w-full text-left px-4 py-3 rounded-lg border-2 border-blue-400 bg-blue-50 hover:border-blue-500 transition" data-refine-action="${advancedSuggestion}">
+              <div class="font-bold text-sm text-blue-800">⭐ Recommended: ${advancedAction}</div>
+              <div class="text-xs text-blue-700 mt-1">${advancedSuggestion.replace(/\*\*/g, '')}</div>
+            </button>
+            
             <button class="refine-option w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-black hover:bg-gray-50 transition" data-refine-action="Make this prompt more specific with concrete details and examples">
               <div class="font-medium text-sm">Make it more specific</div>
               <div class="text-xs text-gray-500">Add more details and concrete examples</div>
@@ -1257,11 +1283,6 @@
               <div class="font-medium text-sm">Make it simpler</div>
               <div class="text-xs text-gray-500">Simplify language and reduce complexity</div>
             </button>
-            
-            <button class="refine-option w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-black hover:bg-gray-50 transition" data-refine-action="Add 2-3 concrete examples to this prompt">
-              <div class="font-medium text-sm">Add examples</div>
-              <div class="text-xs text-gray-500">Include concrete examples and use cases</div>
-            </button>
           </div>
           
           <button class="close-modal w-full px-4 py-2 text-sm text-gray-600 hover:text-black font-medium">Cancel</button>
@@ -1273,7 +1294,7 @@
       // Handle refinement options
       modal.querySelectorAll('.refine-option').forEach((btn) => {
         btn.onclick = async () => {
-          const refinement = btn.dataset.refineAction;
+          const refinement = btn.dataset.refineAction.replace(/\*\*/g, ''); // Remove markdown for the instruction
           
           modal.remove();
           // The refinement prompt is prepended to the user's message
@@ -1439,7 +1460,7 @@
     }
 
     // ==========================================================
-    // END: ADDED/UPDATED JS FUNCTIONS
+    // END: UPDATED JS FUNCTIONS
     // ==========================================================
 
     function displayUserMessage(content) {

@@ -127,20 +127,23 @@ def classify_intent(user_context: str) -> str:
     return "general"
 
 # ==========================================
-# LAYER 1: INSTANT VAGUE CORRECTION (Retained)
+# LAYER 1: INSTANT VAGUE CORRECTION (Updated Logic)
 # ==========================================
 
-async def instant_vague_correction(user_idea: str) -> str:
+async def instant_vague_correction(user_idea: str) -> Tuple[str, bool]:
     """
     Uses a fast, cheap model to instantly refine a vague initial user input
     into a structured, but basic, four-component prompt.
+    Returns the structured prompt and a boolean indicating success.
     """
     available_keys = [k for k in PERFECT_EXAMPLES.keys() if k != 'general']
     random_key = random.choice(available_keys)
     guide_example = PERFECT_EXAMPLES[random_key]['example']
 
     correction_prompt = f"""
-    You are 'Prompt Maximizer'. Your task is to take the user's vague idea and instantly convert it into a structured, four-component prompt (Role, Task, Context, Constraints). Do not ask questions or add detail; simply provide the initial structure using the user's text.
+    You are 'Prompt Maximizer'. Your task is to take the user's vague idea and instantly convert it into a structured, four-component prompt (Role, Task, Context, Constraints). 
+    
+    If the user's idea is too vague (e.g., 'hello', 'hi', 'start'), you MUST respond with the exact phrase: 'TOO VAGUE: CANNOT STRUCTURE'.
 
     ### USER VAGUE IDEA
     {user_idea}
@@ -157,15 +160,21 @@ async def instant_vague_correction(user_idea: str) -> str:
 
     if error:
         logger.warning(f"Vague correction failed with error: {error}")
-        return f"Refinement failed: {user_idea}"
+        return f"Refinement failed: {user_idea}", False
     
     response = raw_response.strip()
+
+    # New check for LLM refusal
+    if "TOO VAGUE: CANNOT STRUCTURE" in response:
+        return "TOO VAGUE: CANNOT STRUCTURE", False
+
+    # The existing successful parsing logic
     match = re.search(r'(Role:.*?Constraints:.*?)', response, re.DOTALL)
     
     if match:
-        return match.group(1).strip()
+        return match.group(1).strip(), True
     
-    return response
+    return response, False
 
 
 # ==========================================
@@ -232,19 +241,31 @@ def smart_model_selection(requested_model: str, is_generation_task: bool) -> str
 
 
 # ==========================================
-# LAYER 5: OPTIMIZATION FRAMEWORK SUGGESTION (Retained)
+# LAYER 5: OPTIMIZATION FRAMEWORK SUGGESTION (Updated: Returns Dict for Frontend)
 # ==========================================
 
-def get_optimization_suggestion(task_category: str) -> str:
-    """Provides advanced optimization framework suggestions for expert users."""
+def get_optimization_suggestion(task_category: str) -> Dict[str, str]:
+    """Provides advanced optimization framework suggestions and a user-facing action."""
     if task_category in ["code_generation", "formal_email"]:
-        return "Try refining this prompt with the **Chain-of-Verification (CoVe)** framework to improve reliability and reduce factual errors."
+        return {
+            "suggestion": "Try refining this prompt with the **Chain-of-Verification (CoVe)** framework to improve reliability and reduce factual errors.",
+            "action": "Refine using CoVe Framework"
+        }
     elif task_category == "marketing_campaign":
-        return "Implement the **AIDA Framework (Attention, Interest, Desire, Action)** in the next refinement to focus the prompt's psychological impact."
+        return {
+            "suggestion": "Implement the **AIDA Framework (Attention, Interest, Desire, Action)** in the next refinement to focus the prompt's psychological impact.",
+            "action": "Refine using AIDA Framework"
+        }
     elif task_category in ["creative_writing", "image_generation"]:
-        return "For maximum quality, try running this prompt multiple times and picking the best result (Self-Consistency), or use the **CoT-Llama** framework for step-by-step creative planning."
+        return {
+            "suggestion": "For maximum quality, try running this prompt multiple times and picking the best result (Self-Consistency), or use the **CoT-Llama** framework for step-by-step creative planning.",
+            "action": "Refine using CoT-Llama Planning"
+        }
     else:
-        return "Consider using the **Few-Shot Learning** technique (add a perfect example to your next query) for better structured output consistency."
+        return {
+            "suggestion": "Consider using the **Few-Shot Learning** technique (add a perfect example to your next query) for better structured output consistency.",
+            "action": "Refine with Few-Shot Examples"
+        }
 
 
 # ==========================================
@@ -259,7 +280,8 @@ async def audit_generated_prompt(expert_prompt: str, task_category: str) -> Opti
     
     try:
         # Layer 5 integration: Get the advanced suggestion
-        advanced_suggestion = get_optimization_suggestion(task_category)
+        adv_suggestion_data = get_optimization_suggestion(task_category)
+        advanced_suggestion = adv_suggestion_data["suggestion"]
         
         # --- Dynamic Feedback Configuration (FIXED LOGIC) ---
         if task_category in ["creative_writing", "image_generation"]:
@@ -550,7 +572,7 @@ def format_response(raw_response: str) -> Tuple[str, str]:
 
 
 # ==========================================
-# MAIN PROCESSING LOGIC
+# MAIN PROCESSING LOGIC (Updated)
 # ==========================================
 async def process_chat_request(
     messages: List[ChatMessage],
@@ -578,14 +600,36 @@ async def process_chat_request(
             "explanation": "Context window exceeded. Cannot process large request."
         }
     
-    # --- LAYER 1: INSTANT CORRECTION (Only on first, vague message) ---
     analysis = analyze_conversation(messages)
+
+    # --- NEW VAGUE INPUT BYPASS LOGIC (Fix for "hELLO") ---
+    user_is_vague = analysis["message_count"] == 1 and (len(user_messages[-1].strip()) < 10 or analysis["completeness_score"] < 10)
     
+    if user_is_vague and mode == "guided":
+        logger.info("Bypassing Layer 1: Input too vague/short. Going straight to smart question.")
+        next_question = generate_smart_question(analysis, messages)
+        
+        return {
+            "expert_prompt": f"Welcome! I'm the Prompt Alchemist. Let's start with your idea. What do you want the AI to do? {next_question or 'Are you ready to generate the final expert prompt?'}",
+            "explanation": "The Alchemist recognized your input as an opening greeting and immediately started the guided process by asking for the most critical piece of information (the Task/Context)."
+        }
+
+    # --- LAYER 1: INSTANT CORRECTION (Only on first, vague but substantive message) ---
     if analysis["message_count"] == 1 and analysis["completeness_score"] < 40 and mode == "guided":
         logger.info("Triggering Layer 1: Instant Vague Correction.")
         
-        structured_idea = await instant_vague_correction(user_context)
-        messages[-1].content = structured_idea
+        structured_idea, success = await instant_vague_correction(user_context)
+        
+        if not success:
+            # The LLM explicitly refused to structure it (e.g., input was still too weird)
+            next_question = generate_smart_question(analysis, messages)
+            return {
+                "expert_prompt": f"Apologies, I still couldn't structure that idea. Let's try the guided approach! {next_question or 'Are you ready to generate the final expert prompt?'}",
+                "explanation": "The model failed to structure the initial idea. Switching to conversational guidance."
+            }
+        
+        # If successful, update the last message content in memory for subsequent analysis
+        messages[-1].content = structured_idea 
         
         analysis = analyze_conversation(messages)
         next_question = generate_smart_question(analysis, messages)
@@ -602,12 +646,6 @@ async def process_chat_request(
     
     next_question = generate_smart_question(analysis, messages)
     user_wants_to_generate = any(keyword in messages[-1].content.lower() for keyword in ['generate', 'ready', 'create it', 'make it'])
-    
-    # FIX: Prioritize asking the question IF a question exists AND the user did not explicitly say "generate."
-    # The generation task is now ONLY true if:
-    # 1. We are in Visual Mode OR
-    # 2. No question is left to ask (completeness >= 70) OR
-    # 3. The user explicitly commanded generation.
     
     is_generation_task = mode == "visual" or (next_question is None) or user_wants_to_generate
 
@@ -646,18 +684,28 @@ async def process_chat_request(
         }
 
     # ==========================================
-    # FOLLOW-UP QUESTION LOGIC
+    # FOLLOW-UP QUESTION LOGIC (Updated Explanation)
     # ==========================================
-    # This block executes if is_generation_task is False (i.e., we must ask a question)
+    
     if next_question:
-        # We return the question, ensuring the model used for this step was the cheaper one (Layer 4)
+        # Determine the reason for the question for the explanation field
+        reason = "Gathering more details to create the perfect prompt."
+        
+        analysis = analyze_conversation(messages)
+        
+        if not analysis["has_task"]:
+            reason = "The most critical component—the **Task**—is missing. We need a clear objective."
+        elif not analysis["has_context"]:
+            reason = "The **Context** (audience, background, use-case) is missing, which dramatically reduces quality."
+        elif not analysis["has_constraints"]:
+            reason = "The **Constraints** (format, tone, length) are missing, which is key to a polished output."
+            
         return {
             "expert_prompt": next_question,
-            "explanation": f"Gathering more details to create the perfect prompt (completeness: {analysis['completeness_score']}%).",
-            # We don't need 'model_used' in the final response but it confirms the logic
+            "explanation": f"{reason} (Completeness: {analysis['completeness_score']}%).",
         }
     
-    # Fallback/Error case (should rarely be hit if logic is correct)
+    # Fallback/Error case
     return {
         "expert_prompt": "I think I have what I need! Would you like me to generate your prompt now, or would you like to add more details?",
         "explanation": "Ready to generate when you are."
