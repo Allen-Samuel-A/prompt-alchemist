@@ -163,7 +163,7 @@ def classify_intent(user_context: str) -> str:
     return "general"
 
 # ==========================================
-# LAYER 1: INSTANT VAGUE CORRECTION (FIXED REGEX & FALLBACK)
+# LAYER 1: INSTANT VAGUE CORRECTION (RETAINED)
 # ==========================================
 
 async def instant_vague_correction(user_idea: str) -> Tuple[str, bool]:
@@ -278,7 +278,7 @@ def smart_model_selection(requested_model: str, is_generation_task: bool) -> str
 
 
 # ==========================================
-# LAYER 5: OPTIMIZATION FRAMEWORK SUGGESTION (UPDATED with ChatGPT phrases)
+# LAYER 5: OPTIMIZATION FRAMEWORK SUGGESTION (RETAINED)
 # ==========================================
 
 def get_optimization_suggestion(task_category: str) -> Dict[str, str]:
@@ -307,7 +307,7 @@ def get_optimization_suggestion(task_category: str) -> Dict[str, str]:
 
 
 # ==========================================
-# LAYER 2: OBJECTIVE AUDIT (UPDATED with Cost/Token/Model Check)
+# LAYER 2: OBJECTIVE AUDIT (RETAINED)
 # ==========================================
 
 async def audit_generated_prompt(expert_prompt: str, target_model: str, task_category: str) -> Optional[AuditResult]:
@@ -349,7 +349,7 @@ async def audit_generated_prompt(expert_prompt: str, target_model: str, task_cat
                  if token_count > 1000 and "free" in target_model.lower():
                      model_check_warning = (model_check_warning or "") + " ⚠️ RISK: Requesting structured output (JSON/XML) with high token count on a smaller/free model increases the risk of mid-output truncation. Review your Max Tokens setting."
         
-        # --- Dynamic Feedback Configuration (FIXED LOGIC) ---
+        # --- Dynamic Feedback Configuration (RETAINED) ---
         if task_category in ["creative_writing", "image_generation"]:
             tech_specificity_feedback = "Focuses on narrative structure, tone, and visual/character depth, essential for creative work."
             tech_specificity_term = "Visual/Narrative Specificity"
@@ -419,7 +419,7 @@ async def audit_generated_prompt(expert_prompt: str, target_model: str, task_cat
 
 
 # ==========================================
-# CONVERSATION INTELLIGENCE (FIXED TYPE CHECKING)
+# CONVERSATION INTELLIGENCE (FIXED WITH USER'S NEW LOGIC)
 # ==========================================
 def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, Any]:
     """Analyzes the conversation to understand what information has been gathered."""
@@ -432,26 +432,65 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, Any]:
         "task_type": None, "completeness_score": 0, "message_count": len(user_messages)
     }
     
-    task_indicators = ["write", "create", "generate", "make", "build", "design", "develop", "draft", "compose", "code", "script", "email", "letter", "blog", "post", "article", "function", "program", "campaign", "website", "selling", "marketing", "need help", "needs to", "process", "validate", "remove", "handle"]
+    # FIXED: More comprehensive task indicators
+    task_indicators = [
+        "write", "create", "generate", "make", "build", "design", "develop", "draft", "compose",
+        "code", "script", "email", "letter", "blog", "post", "article", "function", "program",
+        "campaign", "website", "selling", "marketing", "need help", "needs to", "process",
+        "validate", "remove", "handle", "i want", "i need", "help me", "can you"
+    ]
+    
     if any(indicator in full_conversation for indicator in task_indicators):
-        analysis["has_task"] = True; analysis["completeness_score"] += 25
-        if any(word in full_conversation for word in ["email", "letter", "message"]): analysis["task_type"] = "email"
-        elif any(word in full_conversation for word in ["code", "function", "script", "program", "python", "javascript", "validate", "process"]): analysis["task_type"] = "code"
-        elif any(word in full_conversation for word in ["blog", "post", "article"]): analysis["task_type"] = "blog"
-        elif any(word in full_conversation for word in ["campaign", "marketing", "ad", "selling", "website"]): analysis["task_type"] = "marketing_campaign"
-        elif any(word in full_conversation for word in ["story", "novel", "poem", "fiction"]): analysis["task_type"] = "creative"
+        analysis["has_task"] = True
+        analysis["completeness_score"] += 25
+        
+        # Determine task type
+        if any(word in full_conversation for word in ["email", "letter", "message", "memo"]):  
+            analysis["task_type"] = "email"
+        elif any(word in full_conversation for word in ["code", "function", "script", "program", "python", "javascript", "validate", "process", "class", "method"]):  
+            analysis["task_type"] = "code"
+        elif any(word in full_conversation for word in ["blog", "post", "article"]):  
+            analysis["task_type"] = "blog"
+        elif any(word in full_conversation for word in ["campaign", "marketing", "ad", "selling", "website", "social media"]):  
+            analysis["task_type"] = "marketing_campaign"
+        elif any(word in full_conversation for word in ["story", "novel", "poem", "fiction", "character", "plot"]):  
+            analysis["task_type"] = "creative"
     
-    role_indicators = ["expert", "developer", "engineer", "writer", "designer", "analyst", "specialist", "professional", "senior", "junior", "manager"]
-    if any(indicator in full_conversation for indicator in role_indicators): analysis["has_role"] = True; analysis["completeness_score"] += 20
+    # Role detection
+    role_indicators = [
+        "expert", "developer", "engineer", "writer", "designer", "analyst", "specialist",
+        "professional", "senior", "junior", "manager", "ai", "assistant"
+    ]
+    if any(indicator in full_conversation for indicator in role_indicators):  
+        analysis["has_role"] = True
+        analysis["completeness_score"] += 20
     
-    context_indicators = ["for", "audience", "purpose", "background", "about", "regarding", "boss", "client", "customer", "user", "team", "company", "project", "perfumes", "handmade", "postgresql", "aws lambda", "low-latency"]
+    # Context detection
+    context_indicators = [
+        "for", "audience", "purpose", "background", "about", "regarding", "boss", "client",
+        "customer", "user", "team", "company", "project", "perfumes", "handmade", "postgresql",
+        "aws lambda", "low-latency", "web application", "application", "system", "platform",
+        "data", "entries", "list"
+    ]
     creative_context_indicators = ["setting", "genre", "character", "world-building", "tone", "mood", "style"]
-    if any(indicator in full_conversation for indicator in context_indicators + creative_context_indicators): analysis["has_context"] = True; analysis["completeness_score"] += 25
     
-    constraint_indicators = ["should", "must", "need to", "require", "limit", "words", "tone", "style", "format", "professional", "casual", "formal", "length", "none", "psycopg2", "error handling", "production-ready"]
-    if any(indicator in full_conversation for indicator in constraint_indicators): analysis["has_constraints"] = True; analysis["completeness_score"] += 20
+    if any(indicator in full_conversation for indicator in context_indicators + creative_context_indicators):  
+        analysis["has_context"] = True
+        analysis["completeness_score"] += 25
     
-    if len(full_conversation) > 50: analysis["completeness_score"] += 10
+    # Constraints detection
+    constraint_indicators = [
+        "should", "must", "need to", "require", "limit", "words", "tone", "style", "format",
+        "professional", "casual", "formal", "length", "none", "psycopg2", "error handling",
+        "production-ready", "validate", "remove duplicates", "clean"
+    ]
+    if any(indicator in full_conversation for indicator in constraint_indicators):  
+        analysis["has_constraints"] = True
+        analysis["completeness_score"] += 20
+    
+    # Bonus for detailed input
+    if len(full_conversation) > 50:  
+        analysis["completeness_score"] += 10
     
     return analysis
 
@@ -477,33 +516,46 @@ def generate_smart_question(analysis: Dict[str, Any], messages: List[ChatMessage
     effective_has_constraints = analysis["has_constraints"] or (was_asking_for_constraints and user_wants_to_skip)
 
     # Check if we have enough information (use effective constraints)
-    if analysis["completeness_score"] >= 70 or (effective_has_constraints and analysis["has_context"] and analysis["has_task"]):
+    if analysis["completeness_score"] >= 70 or (effective_has_constraints and analysis["has_context"] and analysis["has_task"] and analysis["has_role"]): # ADDED has_role back for final completeness check
         return None # Ready to generate!
 
-    # --- NEW PRIORITY FLOW ---
+    # --- FIXED PRIORITY FLOW (Task -> Role -> Context -> Constraints) ---
     
-    # 1. Ask for TASK/ROLE if missing (Highest Priority - Axiom 1 & 2)
-    if not analysis["has_task"] or not analysis["has_role"]:
-        # More forceful question to get the core objective
-        return "Thanks for that! Let's clarify the **Task** and **Role** first: What exactly do you want the AI to generate? (e.g., a marketing plan, product descriptions, a function, a story outline, etc.)"
+    # 1. Ask for TASK if missing (Highest Priority)
+    if not analysis["has_task"]:
+        return "Thanks for that! Let's clarify the **Task** first: What exactly do you want the AI to generate? (e.g., a marketing plan, product descriptions, a Python function, a story outline, etc.)"
     
-    # 2. Ask for CONTEXT if missing
+    # 2. Ask for ROLE if missing (Second Priority - Axiom 1)
+    if analysis["has_task"] and not analysis["has_role"]:
+        return "Great! Now that I know the task, let's define the **Role** for the AI. What specific persona should the AI adopt to complete this? (e.g., Senior Developer, Marketing Expert, Academic Tutor, etc.)"
+
+    # 3. Ask for CONTEXT if missing
     if not analysis["has_context"] and not user_wants_to_skip:
         task_type = analysis.get("task_type")
-        if task_type == "email": return "That's a great start! To make this email perfect, could you tell me who the email is for (like a boss, colleague, or client) and what the main situation is? More context helps me craft a precise prompt for you."
-        elif task_type == "code": return "Got it, code generation! I need a little more detail: What exactly should the code accomplish, and what's the specific use case or problem it needs to solve? That helps me zero in on the best prompt."
-        elif task_type == "blog": return "Awesome, a blog post! Who is your target audience, and what's the main idea or message you want them to take away? Focusing the audience helps a lot!"
-        elif task_type == "creative": return "Fantastic! For a great story prompt, we need some narrative structure. What is the desired **tone** (e.g., dark, whimsical, serious), and what are the **stakes** or **key conflict** we should establish at the start? Telling me the genre also helps!"
-        elif task_type == "marketing_campaign": return "Great start! To craft a strong marketing prompt, who is your **final audience** (age, interests, platform)? More context about the products (handmade perfumes) is also key!"
-        else: return "I need a bit more context to craft a really strong prompt. What's the main goal of your prompt, and who is the final audience? Knowing the purpose and the audience makes a huge difference!"
+        if task_type == "email": 
+            return "That's a great start! To make this email perfect, could you tell me who the email is for (like a boss, colleague, or client) and what the main situation is? More context helps me craft a precise prompt for you."
+        elif task_type == "code": 
+            return "Got it, code generation! I need a little more detail: What's the specific use case or problem it needs to solve? For example, is this for a web application, data processing, API integration, etc.?"
+        elif task_type == "blog": 
+            return "Awesome, a blog post! Who is your target audience, and what's the main idea or message you want them to take away? Focusing the audience helps a lot!"
+        elif task_type == "creative": 
+            return "Fantastic! For a great story prompt, we need some narrative structure. What is the desired **tone** (e.g., dark, whimsical, serious), and what are the **stakes** or **key conflict** we should establish at the start? Telling me the genre also helps!"
+        elif task_type == "marketing_campaign": 
+            return "Great start! To craft a strong marketing prompt, who is your **final audience** (age, interests, platform)? More context about the products (handmade perfumes) is also key!"
+        else: 
+            return "I need a bit more context to craft a really strong prompt. What's the main goal of your prompt, and who is the final audience? Knowing the purpose and the audience makes a huge difference!"
     
-    # 3. Ask for CONSTRAINTS if missing (if Task and Context are mostly covered)
+    # 4. Ask for CONSTRAINTS if missing
     if not effective_has_constraints:
         task_type = analysis.get("task_type")
-        if task_type == "email": return "We're almost there! Do you have any specific constraints? For example, should the tone be professional or casual, is there a length limit, or any key points that must be included? (Just type 'none' if you're flexible!)"
-        elif task_type == "code": return "Great! For the code prompt, do you have any technical constraints? Which programming language should be used, are there performance goals, or any specific code styles required? (You can say 'none' if you're flexible!)"
-        elif task_type == "creative": return "Almost ready! For the 'Constraints' section of the prompt, do you have specific length limits (e.g., 500 words), style requirements (e.g., use sensory details), or characters that must be included? (Type 'none' if you're flexible!)"
-        else: return "Last piece of info needed: Do you have any format or style constraints? This could be a length requirement, a specific tone you need (like funny or serious), or things the AI must be sure to avoid. (Type 'none' to move on!)"
+        if task_type == "email": 
+            return "We're almost there! Do you have any specific constraints? For example, should the tone be professional or casual, is there a length limit, or any key points that must be included? (Just type 'none' if you're flexible!)"
+        elif task_type == "code": 
+            return "Great! For the code prompt, do you have any technical constraints? Which programming language should be used, are there performance goals, or any specific code styles required? (You can say 'none' if you're flexible!)"
+        elif task_type == "creative": 
+            return "Almost ready! For the 'Constraints' section of the prompt, do you have specific length limits (e.g., 500 words), style requirements (e.g., use sensory details), or characters that must be included? (Type 'none' if you're flexible!)"
+        else: 
+            return "Last piece of info needed: Do you have any format or style constraints? This could be a length requirement, a specific tone you need (like funny or serious), or things the AI must be sure to avoid. (Type 'none' to move on!)"
     
     # Fallback to generate prompt if score is decent but flow didn't hit 'None'
     if analysis["completeness_score"] >= 40 or user_wants_to_skip:
@@ -518,7 +570,7 @@ def generate_smart_question(analysis: Dict[str, Any], messages: List[ChatMessage
 
 
 # ==========================================
-# PROMPT ENGINEERING (UPDATED to reflect Gemini's Mandates)
+# PROMPT ENGINEERING (RETAINED)
 # ==========================================
 def create_system_prompt(user_idea: str, target_model: str, task_category: str) -> str:
     """Generates an optimized system prompt for the Prompt Alchemist."""
@@ -634,7 +686,7 @@ def format_response(raw_response: str) -> Tuple[str, str]:
 
 
 # ==========================================
-# MAIN PROCESSING LOGIC (Updated to fix question repetition and syntax)
+# MAIN PROCESSING LOGIC (FIXED WITH USER'S NEW LOGIC)
 # ==========================================
 async def process_chat_request(
     messages: List[ChatMessage],
@@ -673,7 +725,7 @@ async def process_chat_request(
     analysis = analyze_conversation(messages)
     analysis_for_question = analyze_conversation(messages_for_next_question) 
 
-    # --- NEW VAGUE INPUT BYPASS LOGIC (Fix for "hELLO") ---
+    # --- NEW VAGUE INPUT BYPASS LOGIC (RETAINED) ---
     # FIX: Added check 'and user_messages' to prevent IndexError on user_messages[-1]
     user_is_vague = analysis["message_count"] == 1 and user_messages and (len(user_messages[-1].strip()) < 10 or analysis["completeness_score"] < 10)
     
@@ -686,7 +738,7 @@ async def process_chat_request(
             "explanation": "The Alchemist recognized your input as an opening greeting and immediately started the guided process by asking for the most critical piece of information (the Task/Context)."
         }
 
-    # --- LAYER 1: INSTANT CORRECTION (Only on first, vague but substantive message) ---
+    # --- LAYER 1: INSTANT CORRECTION (RETAINED) ---
     if analysis["message_count"] == 1 and analysis["completeness_score"] < 40 and mode == "guided":
         logger.info("Triggering Layer 1: Instant Vague Correction.")
         
@@ -721,13 +773,13 @@ async def process_chat_request(
     
     is_generation_task = mode == "visual" or (next_question is None) or user_wants_to_generate
 
-    # --- LAYER 3: ADAPTIVE MEMORY COMPRESSION ---
+    # --- LAYER 3: ADAPTIVE MEMORY COMPRESSION (RETAINED) ---
     final_messages_for_api = messages
     if len(messages) > ModelConfig.MAX_HISTORY_MESSAGES and is_generation_task:
         logger.info(f"Triggering Layer 3: Compressing history from {len(messages)} messages.")
         final_messages_for_api, summary = await summarize_conversation(messages)
         
-    # --- LAYER 4: SMART MODEL SELECTION (Model Downgrade for chat steps) ---
+    # --- LAYER 4: SMART MODEL SELECTION (RETAINED) ---
     final_model_to_use = smart_model_selection(model, is_generation_task)
 
     if is_generation_task:
@@ -764,14 +816,19 @@ async def process_chat_request(
         # Determine the reason for the question for the explanation field
         reason = "Gathering more details to create the perfect prompt."
         
+        # This uses the clean analysis_for_question to ensure the *next* question is accurate
         current_analysis = analyze_conversation(messages_for_next_question) 
         
+        # Now, use the clean analysis to determine the precise reason for the question
+        # This logic is based on the logic in generate_smart_question (Task -> Role -> Context -> Constraints)
         if not current_analysis["has_task"]:
-            reason = "The most critical component—the **Task**—is missing. We need a clear objective."
+            reason = "The most critical component—the **Task**—is missing. We need a clear objective (Axiom 2)."
+        elif current_analysis["has_task"] and not current_analysis["has_role"]: 
+            reason = "The **Role** (specialized persona) is missing, which is key to focused and authoritative responses (Axiom 1)."
         elif not current_analysis["has_context"]:
             reason = "The **Context** (audience, background, use-case) is missing, which dramatically reduces quality."
         elif not current_analysis["has_constraints"]:
-            reason = "The **Constraints** (format, tone, length) are missing, which is key to a polished output."
+            reason = "The **Constraints** (format, tone, length) are missing, which is key to a polished output (Axiom 3)."
             
         return {
             "expert_prompt": next_question,
