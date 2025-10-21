@@ -284,7 +284,7 @@ def smart_model_selection(requested_model: str, is_generation_task: bool) -> str
 def get_optimization_suggestion(task_category: str) -> Dict[str, str]:
     """Provides advanced optimization framework suggestions and a user-facing action."""
     # Logic based on WHEN TO USE from ChatGPT's report
-    if task_category in ["code_generation", "formal_email"]: # Logic puzzles, math, structured tasks
+    if task_category in ["code_generation", "formal_email", "blog"]: # Added blog to CoT as it's an informational/structured task
         return {
             "suggestion": "The **Chain-of-Thought (CoT)** method is highly recommended to improve reliability and logical structure. **Key Phrase to Inject:** 'Let’s think step by step.'",
             "action": "Refine using CoT (Step-by-Step) Reasoning"
@@ -368,7 +368,7 @@ async def audit_generated_prompt(expert_prompt: str, target_model: str, task_cat
             tech_specificity_score = random.randint(85, 95)
             suggestions = [advanced_suggestion, "Ensure the target programming language and framework are explicitly named."]
         
-        elif task_category == "formal_email":
+        elif task_category == "formal_email" or task_category == "blog": # Added blog here for technical focus
             tech_specificity_feedback = "Uses professional communication terminology and maintains appropriate diplomatic tone throughout."
             tech_specificity_term = "Professional Tone Specificity"
             tech_specificity_score = random.randint(88, 96)
@@ -470,7 +470,7 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, Any]:
         "for", "audience", "purpose", "background", "about", "regarding", "boss", "client",
         "customer", "user", "team", "company", "project", "perfumes", "handmade", "postgresql",
         "aws lambda", "low-latency", "web application", "application", "system", "platform",
-        "data", "entries", "list"
+        "data", "entries", "list", "copilot", "github" # Added copilot and github for context detection
     ]
     creative_context_indicators = ["setting", "genre", "character", "world-building", "tone", "mood", "style"]
     
@@ -515,8 +515,8 @@ def generate_smart_question(analysis: Dict[str, Any], messages: List[ChatMessage
     # FIX: If user just skipped constraints question, treat as "has_constraints" for flow purposes
     effective_has_constraints = analysis["has_constraints"] or (was_asking_for_constraints and user_wants_to_skip)
 
-    # Check if we have enough information (use effective constraints)
-    if analysis["completeness_score"] >= 70 or (effective_has_constraints and analysis["has_context"] and analysis["has_task"] and analysis["has_role"]): # ADDED has_role back for final completeness check
+    # CRITICAL FIX: Changed completeness score from 70 to 90 to prevent premature generation
+    if analysis["completeness_score"] >= 90 or (effective_has_constraints and analysis["has_context"] and analysis["has_task"] and analysis["has_role"]):
         return None # Ready to generate!
 
     # --- FIXED PRIORITY FLOW (Task -> Role -> Context -> Constraints) ---
