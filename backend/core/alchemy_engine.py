@@ -432,11 +432,11 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, Any]:
         "task_type": None, "completeness_score": 0, "message_count": len(user_messages)
     }
     
-    task_indicators = ["write", "create", "generate", "make", "build", "design", "develop", "draft", "compose", "code", "script", "email", "letter", "blog", "post", "article", "function", "program", "campaign", "website", "selling", "marketing"]
+    task_indicators = ["write", "create", "generate", "make", "build", "design", "develop", "draft", "compose", "code", "script", "email", "letter", "blog", "post", "article", "function", "program", "campaign", "website", "selling", "marketing", "need help", "needs to", "process", "validate", "remove", "handle"]
     if any(indicator in full_conversation for indicator in task_indicators):
         analysis["has_task"] = True; analysis["completeness_score"] += 25
         if any(word in full_conversation for word in ["email", "letter", "message"]): analysis["task_type"] = "email"
-        elif any(word in full_conversation for word in ["code", "function", "script", "program"]): analysis["task_type"] = "code"
+        elif any(word in full_conversation for word in ["code", "function", "script", "program", "python", "javascript", "validate", "process"]): analysis["task_type"] = "code"
         elif any(word in full_conversation for word in ["blog", "post", "article"]): analysis["task_type"] = "blog"
         elif any(word in full_conversation for word in ["campaign", "marketing", "ad", "selling", "website"]): analysis["task_type"] = "marketing_campaign"
         elif any(word in full_conversation for word in ["story", "novel", "poem", "fiction"]): analysis["task_type"] = "creative"
