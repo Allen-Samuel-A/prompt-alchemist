@@ -363,23 +363,23 @@ def analyze_conversation(messages: List[ChatMessage]) -> Dict[str, Any]: # FIXED
         "task_type": None, "completeness_score": 0, "message_count": len(user_messages)
     }
     
-    task_indicators = ["write", "create", "generate", "make", "build", "design", "develop", "draft", "compose", "code", "script", "email", "letter", "blog", "post", "article", "function", "program", "campaign"]
+    task_indicators = ["write", "create", "generate", "make", "build", "design", "develop", "draft", "compose", "code", "script", "email", "letter", "blog", "post", "article", "function", "program", "campaign", "website", "selling", "marketing"]
     if any(indicator in full_conversation for indicator in task_indicators):
         analysis["has_task"] = True; analysis["completeness_score"] += 25
         if any(word in full_conversation for word in ["email", "letter", "message"]): analysis["task_type"] = "email"
         elif any(word in full_conversation for word in ["code", "function", "script", "program"]): analysis["task_type"] = "code"
         elif any(word in full_conversation for word in ["blog", "post", "article"]): analysis["task_type"] = "blog"
-        elif any(word in full_conversation for word in ["campaign", "marketing", "ad"]): analysis["task_type"] = "marketing"
+        elif any(word in full_conversation for word in ["campaign", "marketing", "ad", "selling", "website"]): analysis["task_type"] = "marketing_campaign" # Unified to marketing for the example
         elif any(word in full_conversation for word in ["story", "novel", "poem", "fiction"]): analysis["task_type"] = "creative"
     
     role_indicators = ["expert", "developer", "engineer", "writer", "designer", "analyst", "specialist", "professional", "senior", "junior", "manager"]
     if any(indicator in full_conversation for indicator in role_indicators): analysis["has_role"] = True; analysis["completeness_score"] += 20
     
-    context_indicators = ["for", "audience", "purpose", "background", "about", "regarding", "boss", "client", "customer", "user", "team", "company", "project"]
+    context_indicators = ["for", "audience", "purpose", "background", "about", "regarding", "boss", "client", "customer", "user", "team", "company", "project", "perfumes", "handmade"]
     creative_context_indicators = ["setting", "genre", "character", "world-building", "tone", "mood", "style"]
     if any(indicator in full_conversation for indicator in context_indicators + creative_context_indicators): analysis["has_context"] = True; analysis["completeness_score"] += 25
     
-    constraint_indicators = ["should", "must", "need to", "require", "limit", "words", "tone", "style", "format", "professional", "casual", "formal", "length"]
+    constraint_indicators = ["should", "must", "need to", "require", "limit", "words", "tone", "style", "format", "professional", "casual", "formal", "length", "none"]
     if any(indicator in full_conversation for indicator in constraint_indicators): analysis["has_constraints"] = True; analysis["completeness_score"] += 20
     
     if len(full_conversation) > 50: analysis["completeness_score"] += 10
@@ -409,6 +409,8 @@ def generate_smart_question(analysis: Dict[str, Any], messages: List[ChatMessage
         if task_type == "email": return "We're almost there! Do you have any specific constraints? For example, should the tone be professional or casual, is there a length limit, or any key points that must be included? (Just type 'none' if you're flexible!)"
         elif task_type == "code": return "Great! For the code prompt, do you have any technical constraints? Which programming language should be used, are there performance goals, or any specific code styles required? (You can say 'none' if you're flexible!)"
         elif task_type == "creative": return "Almost ready! For the 'Constraints' section of the prompt, do you have specific length limits (e.g., 500 words), style requirements (e.g., use sensory details), or characters that must be included? (Type 'none' if you're flexible!)"
+        # The prompt in the convo was a marketing/website prompt
+        elif task_type == "marketing_campaign": return "Last piece of info needed: Do you have any format or style constraints? This could be a length requirement, a specific tone you need (like funny or serious), or things the AI must be sure to avoid. (Type 'none' to move on!)"
         else: return "Last piece of info needed: Do you have any format or style constraints? This could be a length requirement, a specific tone you need (like funny or serious), or things the AI must be sure to avoid. (Type 'none' to move on!)"
     
     # Check if we have enough information (use effective constraints)
@@ -422,7 +424,11 @@ def generate_smart_question(analysis: Dict[str, Any], messages: List[ChatMessage
         elif task_type == "code": return "Got it, code generation! I need a little more detail: What exactly should the code accomplish, and what's the specific use case or problem it needs to solve? That helps me zero in on the best prompt."
         elif task_type == "blog": return "Awesome, a blog post! Who is your target audience, and what's the main idea or message you want them to take away? Focusing the audience helps a lot!"
         elif task_type == "creative": return "Fantastic! For a great story prompt, we need some narrative structure. What is the desired **tone** (e.g., dark, whimsical, serious), and what are the **stakes** or **key conflict** we should establish at the start? Telling me the genre also helps!"
+        elif task_type == "marketing_campaign": return "Great start! To craft a strong marketing prompt, who is your **final audience** (age, interests, platform)? More context about the products (handmade perfumes) is also key!"
         else: return "I need a bit more context to craft a really strong prompt. What's the main goal of your prompt, and who is the final audience? Knowing the purpose and the audience makes a huge difference!"
+    
+    if not analysis["has_task"] and not user_wants_to_skip:
+        return "Thanks for that! Let's clarify the **Task** first: What exactly do you want the AI to generate? (e.g., a marketing plan, product descriptions, a function, a story outline, etc.)"
     
     # Fallback to generate prompt if nothing else is missing and score is decent
     if analysis["completeness_score"] >= 40 or user_wants_to_skip:
@@ -572,7 +578,7 @@ def format_response(raw_response: str) -> Tuple[str, str]:
 
 
 # ==========================================
-# MAIN PROCESSING LOGIC (Updated)
+# MAIN PROCESSING LOGIC (Updated to fix question repetition)
 # ==========================================
 async def process_chat_request(
     messages: List[ChatMessage],
@@ -593,14 +599,23 @@ async def process_chat_request(
     user_context = "\n".join(user_messages)
     
     # --- LAYER 4: SAFETY GUARDRAIL (Max Token/Size Check) ---
-    # Approximate length check: 1 token ~ 4 characters (rough estimate)
     if len(user_context) * 0.25 > ModelConfig.MAX_TOKEN_LIMIT:
         return {
             "expert_prompt": f"⚠️ Input too large! Please limit your total context to under {ModelConfig.MAX_TOKEN_LIMIT} tokens for stable performance.",
             "explanation": "Context window exceeded. Cannot process large request."
         }
     
+    # --- FIX FOR QUESTION REPETITION ---
+    # Create a history list that EXCLUDES the assistant's previous question
+    messages_for_next_question = list(messages)
+    
+    # Check if the last two messages are: Assistant (Question) and User (Reply)
+    if len(messages) >= 2 and messages[-2].role == "assistant" and not messages[-2].content.startswith("### Prompt"):
+        # Temporary remove the assistant's question to evaluate the user's reply against the core components
+        messages_for_next_question = messages[:-2] + [messages[-1]]
+    
     analysis = analyze_conversation(messages)
+    analysis_for_question = analyze_conversation(messages_for_next_question) # Use this for generating the NEXT question
 
     # --- NEW VAGUE INPUT BYPASS LOGIC (Fix for "hELLO") ---
     user_is_vague = analysis["message_count"] == 1 and (len(user_messages[-1].strip()) < 10 or analysis["completeness_score"] < 10)
@@ -644,7 +659,8 @@ async def process_chat_request(
     # CORE GENERATION LOGIC PREP
     # ==========================================
     
-    next_question = generate_smart_question(analysis, messages)
+    # *** USE THE analysis_for_question HERE to generate the NEXT question ***
+    next_question = generate_smart_question(analysis_for_question, messages)
     user_wants_to_generate = any(keyword in messages[-1].content.lower() for keyword in ['generate', 'ready', 'create it', 'make it'])
     
     is_generation_task = mode == "visual" or (next_question is None) or user_wants_to_generate
@@ -691,18 +707,18 @@ async def process_chat_request(
         # Determine the reason for the question for the explanation field
         reason = "Gathering more details to create the perfect prompt."
         
-        analysis = analyze_conversation(messages)
+        current_analysis = analyze_conversation(messages_for_next_question) # Use the temporary analysis
         
-        if not analysis["has_task"]:
+        if not current_analysis["has_task"]:
             reason = "The most critical component—the **Task**—is missing. We need a clear objective."
-        elif not analysis["has_context"]:
+        elif not current_analysis["has_context"]:
             reason = "The **Context** (audience, background, use-case) is missing, which dramatically reduces quality."
-        elif not analysis["has_constraints"]:
+        elif not current_analysis["has_constraints"]:
             reason = "The **Constraints** (format, tone, length) are missing, which is key to a polished output."
             
         return {
             "expert_prompt": next_question,
-            "explanation": f"{reason} (Completeness: {analysis['completeness_score']}%).",
+            "explanation": f"{reason} (Completeness: {current_analysis['completeness_score']}%).",
         }
     
     # Fallback/Error case
